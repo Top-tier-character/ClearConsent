@@ -203,9 +203,9 @@ export default function SimulatePage() {
         </div>
 
         {/* Results */}
-        <div className="lg:col-span-7 flex flex-col gap-6">
+        <div className="lg:col-span-7 flex flex-col gap-6 min-w-0">
           {/* 2x2 Grid */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid sm:grid-cols-2 gap-4">
             <Card className="bg-surface dark:bg-card border-border shadow-sm border-[1px] rounded-xl flex flex-col justify-center p-6 min-h-[140px]">
               <p className="text-[16px] text-muted-foreground font-semibold mb-1 uppercase">Monthly EMI</p>
               <div className={cn("text-[28px] lg:text-[36px] font-bold text-primary dark:text-primary-foreground transition-colors duration-300", flash && "text-danger")}>
