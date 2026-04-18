@@ -1,15 +1,103 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { RiskMeter } from '@/components/RiskMeter';
-import { Volume2, CheckCircle, AlertTriangle, UploadCloud, FileText, ArrowRight } from 'lucide-react';
+import {
+  Volume2, CheckCircle, AlertTriangle, UploadCloud, FileText,
+  ArrowRight, Loader2, RefreshCw, X,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import type { Language } from '@/lib/store';
 
+// ─── Small read-aloud helper ──────────────────────────────────────────────────
+function speakText(text: string, lang: Language) {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = lang === 'hi' ? 'hi-IN' : lang === 'mr' ? 'mr-IN' : 'en-IN';
+  window.speechSynthesis.speak(utter);
+}
+
+// ─── Loading skeletons ────────────────────────────────────────────────────────
+function ResultSkeletons() {
+  return (
+    <div className="space-y-4">
+      {[
+        'border-l-success',
+        'border-l-warning',
+        'border-l-danger',
+      ].map((color, i) => (
+        <div
+          key={i}
+          className={cn(
+            'border-l-[6px] rounded-xl border border-border bg-surface dark:bg-card p-6 animate-pulse',
+            color,
+          )}
+        >
+          <div className="h-6 w-1/3 bg-border/60 rounded mb-4" />
+          <div className="space-y-2">
+            <div className="h-4 w-full bg-border/40 rounded" />
+            <div className="h-4 w-5/6 bg-border/40 rounded" />
+            <div className="h-4 w-4/6 bg-border/40 rounded" />
+          </div>
+        </div>
+      ))}
+      <div className="h-20 w-full bg-primary/20 rounded-xl animate-pulse" />
+      <div className="h-16 w-full bg-border/40 rounded-xl animate-pulse" />
+    </div>
+  );
+}
+
+// ─── Result card ──────────────────────────────────────────────────────────────
+function ResultCard({
+  title, items, borderColor, icon, readText, lang,
+}: {
+  title: string;
+  items: string[];
+  borderColor: string;
+  icon: React.ReactNode;
+  readText: string;
+  lang: Language;
+}) {
+  return (
+    <Card className={cn('border-l-[6px] border-y border-r border-border bg-surface dark:bg-card shadow-sm rounded-xl', borderColor)}>
+      <CardContent className="pt-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-[22px] font-bold flex items-center gap-2 text-primary dark:text-primary-foreground">
+            {icon} {title}
+          </h3>
+          <Button
+            variant="ghost"
+            size="icon"
+            title="Read aloud"
+            onClick={() => speakText(readText, lang)}
+          >
+            <Volume2 className="h-6 w-6 text-muted-foreground hover:text-primary" />
+          </Button>
+        </div>
+        <ul className="space-y-2">
+          {items.map((item, i) => (
+            <li key={i} className="flex items-start text-[17px] text-foreground font-medium gap-2">
+              <span className="mt-1 shrink-0">{icon}</span>
+              {item}
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 export default function AnalyzePage() {
-  const { language, currentAnalysis, setCurrentAnalysis, addHistory } = useAppStore();
+  const { language, setLanguage, currentAnalysis, setCurrentAnalysis, addHistory } = useAppStore();
   const [text, setText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -18,12 +106,12 @@ export default function AnalyzePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
-  const handleAnalyze = async () => {
-    if (!text.trim()) {
+  // ── Core analyze call ──────────────────────────────────────────────────────
+  const runAnalysis = useCallback(async (docText: string, lang: Language) => {
+    if (!docText.trim()) {
       setError('Please paste document text or upload a file first.');
       return;
     }
-    
     setError(null);
     setIsLoading(true);
 
@@ -31,7 +119,7 @@ export default function AnalyzePage() {
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, language }),
+        body: JSON.stringify({ text: docText, language: lang }),
       });
 
       if (!response.ok) {
@@ -41,7 +129,6 @@ export default function AnalyzePage() {
 
       const data = await response.json();
 
-      // Normalise the backend field names to what the UI already expects
       const result = {
         id: `CLR-${Date.now()}`,
         pros: data.pros ?? [],
@@ -63,17 +150,21 @@ export default function AnalyzePage() {
         details: result,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to analyze the document.');
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
     }
+  }, [setCurrentAnalysis, addHistory]);
+
+  // ── Language change → re-run if results already showing ──────────────────
+  const handleLanguageChange = (lang: Language) => {
+    setLanguage(lang);
+    if (currentAnalysis && text.trim()) {
+      runAnalysis(text, lang);
+    }
   };
 
-  const handleConfirm = () => {
-    router.push('/confirm');
-  };
-
-  /** Read a .txt or .pdf file and populate the textarea. */
+  // ── File upload ────────────────────────────────────────────────────────────
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -87,27 +178,26 @@ export default function AnalyzePage() {
         const content = await file.text();
         setText(content);
       } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-        // Lightweight PDF text extraction without external libraries.
-        // Works on text-based (non-scanned) PDFs by parsing BT...ET blocks.
-        const buffer = await file.arrayBuffer();
-        const bytes = new Uint8Array(buffer);
-        let raw = '';
-        for (let i = 0; i < bytes.length; i++) {
-          const c = bytes[i];
-          if ((c >= 32 && c <= 126) || c === 10 || c === 13) raw += String.fromCharCode(c);
+        // Dynamic import to avoid SSR issues with pdfjs-dist
+        const pdfjs = await import('pdfjs-dist');
+        // Point worker to the bundled worker file
+        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+          'pdfjs-dist/build/pdf.worker.min.mjs',
+          import.meta.url,
+        ).toString();
+
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+        let fullText = '';
+        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+          const page = await pdf.getPage(pageNum);
+          const content = await page.getTextContent();
+          const pageText = content.items
+            .map((item: any) => ('str' in item ? item.str : ''))
+            .join(' ');
+          fullText += pageText + '\n';
         }
-        const btEtMatches = raw.match(/BT[\s\S]*?ET/g) ?? [];
-        let extracted = '';
-        if (btEtMatches.length > 0) {
-          extracted = btEtMatches
-            .join(' ')
-            .replace(/\(([^)]+)\)\s*Tj/g, '$1 ')
-            .replace(/\[([^\]]+)\]\s*TJ/g, (_, inner) => inner.replace(/\(([^)]+)\)/g, '$1 '))
-            .replace(/[^\x20-\x7E\n\r]/g, ' ')
-            .replace(/\s{2,}/g, ' ')
-            .trim();
-        }
-        setText(extracted || raw.replace(/\s{2,}/g, ' ').trim());
+        setText(fullText.trim());
       } else {
         setError('Unsupported file type. Please upload a .txt or .pdf file.');
         setUploadFileName(null);
@@ -125,51 +215,43 @@ export default function AnalyzePage() {
     setText('');
     setUploadFileName(null);
     setError(null);
-  };
-
-  /** Calls /api/tts to get the BCP-47 language code, then uses browser speechSynthesis. */
-  const readAloud = async (textToRead: string) => {
-    if (!('speechSynthesis' in window)) {
-      alert('Text-to-speech is not supported in this browser.');
-      return;
-    }
-    try {
-      const res = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: textToRead, language }),
-      });
-      const { text: ttsText, language_code } = await res.json();
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(ttsText);
-      utterance.lang = language_code;
-      window.speechSynthesis.speak(utterance);
-    } catch {
-      // Fallback: speak directly without API
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(textToRead);
-      utterance.lang = language === 'hi' ? 'hi-IN' : language === 'mr' ? 'mr-IN' : 'en-IN';
-      window.speechSynthesis.speak(utterance);
-    }
+    setCurrentAnalysis(null);
   };
 
   return (
     <div className="container mx-auto px-6 py-8 max-w-6xl">
-      <h1 className="text-[32px] font-bold text-primary dark:text-primary-foreground mb-8">
-        Here is what this document means for you
-      </h1>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <h1 className="text-[32px] font-bold text-primary dark:text-primary-foreground">
+          Understand Before You Sign
+        </h1>
+        {/* Language selector */}
+        <Select value={language} onValueChange={(v: any) => handleLanguageChange(v as Language)}>
+          <SelectTrigger className="w-[140px] h-[44px] font-semibold">
+            <SelectValue placeholder="Language" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="en">English</SelectItem>
+            <SelectItem value="hi">हिंदी</SelectItem>
+            <SelectItem value="mr">मराठी</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       <div className="grid lg:grid-cols-2 gap-10">
-        {/* Input Column */}
-        <div className="flex flex-col gap-6">
-          <Card className="bg-surface dark:bg-card border-border shadow-sm rounded-xl border-[1px]">
-            <CardContent className="pt-6 flex flex-col gap-6">
-              <textarea 
-                className="flex min-h-[350px] w-full rounded-md border border-border bg-transparent px-4 py-3 text-[18px] placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                placeholder="Paste your loan agreement, terms, or insurance clauses here..."
+        {/* ── Input Column ── */}
+        <div className="flex flex-col gap-4">
+          <Card className="bg-surface dark:bg-card border-border shadow-sm rounded-xl border">
+            <CardContent className="pt-6 flex flex-col gap-4">
+              <label className="text-[16px] font-semibold text-primary dark:text-primary-foreground">
+                Paste your document text here
+              </label>
+              <textarea
+                className="flex min-h-[220px] w-full rounded-md border border-border bg-transparent px-4 py-3 text-[17px] placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary resize-y"
+                placeholder="Paste your loan agreement, insurance policy, or terms here…"
                 value={text}
                 onChange={(e) => setText(e.target.value)}
               />
+
               {/* Hidden real file input */}
               <input
                 ref={fileInputRef}
@@ -179,18 +261,18 @@ export default function AnalyzePage() {
                 onChange={handleFileUpload}
               />
 
-              {/* Upload trigger button */}
+              {/* Upload button / file badge */}
               {uploadFileName ? (
                 <div className="flex items-center gap-3 w-full h-[48px] px-4 rounded-lg border border-success bg-success/10">
                   <FileText className="h-5 w-5 text-success shrink-0" />
-                  <span className="text-[16px] font-semibold text-success truncate flex-1">{uploadFileName}</span>
+                  <span className="text-[15px] font-semibold text-success truncate flex-1">{uploadFileName}</span>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={clearUpload}
                     className="text-muted-foreground hover:text-danger shrink-0 h-7 px-2"
                   >
-                    Clear
+                    <X className="h-4 w-4" />
                   </Button>
                 </div>
               ) : (
@@ -198,128 +280,118 @@ export default function AnalyzePage() {
                   variant="outline"
                   disabled={isUploading}
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full h-[48px] text-[18px] text-primary dark:text-primary-foreground font-semibold border-dashed border-2 bg-transparent hover:bg-muted"
+                  className="w-full h-[48px] text-[17px] text-primary dark:text-primary-foreground font-semibold border-dashed border-2 bg-transparent hover:bg-muted"
                 >
-                  <UploadCloud className="mr-2 h-6 w-6" />
-                  {isUploading ? 'Reading file...' : 'Upload File (.pdf, .txt)'}
+                  <UploadCloud className="mr-2 h-5 w-5" />
+                  {isUploading ? 'Reading file…' : 'Upload File (.pdf, .txt)'}
                 </Button>
               )}
 
-              
+              {/* Error banner */}
               {error && (
-                <div className="bg-danger/10 border-l-4 border-danger p-4 rounded-r text-danger font-semibold flex items-center justify-between">
-                  {error}
-                  <Button variant="link" onClick={() => setError(null)} className="text-danger p-0">Dismiss</Button>
+                <div className="bg-danger/10 border-l-4 border-danger p-4 rounded-r text-danger font-semibold text-[15px] flex items-start justify-between gap-3">
+                  <span>{error}</span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {text.trim() && (
+                      <Button
+                        variant="link"
+                        size="sm"
+                        onClick={() => runAnalysis(text, language)}
+                        className="text-danger p-0 h-auto font-bold"
+                      >
+                        <RefreshCw className="h-4 w-4 mr-1" /> Retry
+                      </Button>
+                    )}
+                    <Button variant="link" onClick={() => setError(null)} className="text-danger p-0 h-auto">
+                      Dismiss
+                    </Button>
+                  </div>
                 </div>
               )}
-              
-              <Button 
-                onClick={handleAnalyze} 
-                disabled={isLoading}
-                className="w-full h-[52px] text-[20px] font-bold bg-primary hover:bg-primary/90 text-white rounded-xl"
+
+              <Button
+                onClick={() => runAnalysis(text, language)}
+                disabled={isLoading || isUploading}
+                className="w-full h-[52px] text-[20px] font-bold bg-primary hover:bg-primary/90 text-white rounded-xl disabled:opacity-60"
               >
-                {isLoading ? 'Analyzing...' : 'Analyze This'} <ArrowRight className="ml-2 h-6 w-6" />
+                {isLoading
+                  ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Analyzing…</>
+                  : <>Analyze This <ArrowRight className="ml-2 h-5 w-5" /></>}
               </Button>
             </CardContent>
           </Card>
         </div>
 
-        {/* Results Column */}
-        <div className="flex flex-col gap-6">
+        {/* ── Results Column ── */}
+        <div className="flex flex-col gap-5">
           {isLoading ? (
-            <div className="space-y-4">
-              <div className="h-[140px] bg-border/50 animate-pulse rounded-xl" />
-              <div className="h-[140px] bg-border/50 animate-pulse rounded-xl" />
-              <div className="h-[140px] bg-border/50 animate-pulse rounded-xl" />
-            </div>
+            <ResultSkeletons />
           ) : currentAnalysis ? (
             <div className="space-y-4">
-              {/* Stack 1: Pros */}
-              <Card className="border-l-[6px] border-l-success border-y-[1px] border-r-[1px] border-border bg-surface dark:bg-card shadow-sm rounded-xl">
-                <CardContent className="pt-6">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-[24px] font-bold flex items-center text-primary dark:text-primary-foreground">
-                      <CheckCircle className="mr-3 h-8 w-8 text-success" /> 
-                      What You Will Get
-                    </h3>
-                    <Button variant="ghost" size="icon" onClick={() => readAloud("What you will get. " + currentAnalysis.pros.join(". "))}>
-                      <Volume2 className="h-6 w-6 text-muted-foreground hover:text-primary" />
-                    </Button>
-                  </div>
-                  <ul className="space-y-3">
-                    {currentAnalysis.pros.map((item: string, i: number) => (
-                      <li key={i} className="flex items-start text-[18px] text-foreground font-medium">
-                        <span className="text-success mr-3 text-[22px] leading-tight">•</span>
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
+              {/* Pros */}
+              <ResultCard
+                title="What You Will Get"
+                items={currentAnalysis.pros}
+                borderColor="border-l-success"
+                icon={<CheckCircle className="h-5 w-5 text-success shrink-0" />}
+                readText={`What you will get. ${currentAnalysis.pros.join('. ')}`}
+                lang={language}
+              />
 
-              {/* Stack 2: Cons */}
-              <Card className="border-l-[6px] border-l-warning border-y-[1px] border-r-[1px] border-border bg-surface dark:bg-card shadow-sm rounded-xl">
-                <CardContent className="pt-6">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-[24px] font-bold flex items-center text-primary dark:text-primary-foreground">
-                      <AlertTriangle className="mr-3 h-8 w-8 text-warning" /> 
-                      What You Must Pay or Do
-                    </h3>
-                    <Button variant="ghost" size="icon" onClick={() => readAloud("What you must pay or do. " + currentAnalysis.cons.join(". "))}>
-                      <Volume2 className="h-6 w-6 text-muted-foreground hover:text-primary" />
-                    </Button>
-                  </div>
-                  <ul className="space-y-3">
-                    {currentAnalysis.cons.map((item: string, i: number) => (
-                      <li key={i} className="flex items-start text-[18px] text-foreground font-medium">
-                        <span className="text-warning mr-3 text-[22px] leading-tight">•</span>
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
+              {/* Cons */}
+              <ResultCard
+                title="What You Must Pay or Do"
+                items={currentAnalysis.cons}
+                borderColor="border-l-warning"
+                icon={<AlertTriangle className="h-5 w-5 text-warning shrink-0" />}
+                readText={`What you must pay or do. ${currentAnalysis.cons.join('. ')}`}
+                lang={language}
+              />
 
-              {/* Stack 3: Hidden Clauses */}
-              <Card className="border-l-[6px] border-l-danger border-y-[1px] border-r-[1px] border-border bg-surface dark:bg-card shadow-sm rounded-xl">
-                <CardContent className="pt-6">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-[24px] font-bold flex items-center text-primary dark:text-primary-foreground">
-                      <AlertTriangle className="mr-3 h-8 w-8 text-danger" /> 
-                      Risks and Hidden Rules
-                    </h3>
-                    <Button variant="ghost" size="icon" onClick={() => readAloud("Risks and hidden rules. " + currentAnalysis.hiddenClauses.join(". "))}>
-                      <Volume2 className="h-6 w-6 text-muted-foreground hover:text-primary" />
-                    </Button>
-                  </div>
-                  <ul className="space-y-3">
-                    {currentAnalysis.hiddenClauses.map((item: string, i: number) => (
-                      <li key={i} className="flex items-start text-[18px] text-foreground font-medium">
-                        <span className="text-danger mr-3 text-[22px] leading-tight">•</span>
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
+              {/* Hidden clauses */}
+              <ResultCard
+                title="Risks and Hidden Rules"
+                items={currentAnalysis.hiddenClauses}
+                borderColor="border-l-danger"
+                icon={<AlertTriangle className="h-5 w-5 text-danger shrink-0" />}
+                readText={`Risks and hidden rules. ${currentAnalysis.hiddenClauses.join('. ')}`}
+                lang={language}
+              />
 
-              {/* Full Width Callout */}
-              <div className="bg-primary px-6 py-5 rounded-xl shadow-md my-6">
-                <p className="text-[24px] font-bold text-white leading-tight">
-                  {currentAnalysis.repaymentInfo}
-                </p>
-              </div>
+              {/* Callout box */}
+              {currentAnalysis.repaymentInfo && (
+                <div className="bg-primary px-6 py-5 rounded-xl shadow-md">
+                  <p className="text-[22px] font-bold text-white leading-tight">
+                    {currentAnalysis.repaymentInfo}
+                  </p>
+                </div>
+              )}
 
-              {/* Risk Meter */}
-              <div className="bg-surface dark:bg-card p-6 rounded-xl border border-border mt-4">
+              {/* Risk meter */}
+              <div className="bg-surface dark:bg-card p-6 rounded-xl border border-border">
                 <RiskMeter score={currentAnalysis.riskScore} />
+                {currentAnalysis.risk_explanation && (
+                  <p className="text-[15px] text-muted-foreground mt-3 font-medium">
+                    {currentAnalysis.risk_explanation}
+                  </p>
+                )}
               </div>
-              
+
+              {/* Go to simulate CTA */}
+              <Button
+                onClick={() => router.push('/simulate')}
+                variant="outline"
+                className="w-full h-[48px] text-[17px] font-bold border-[2px] border-primary text-primary hover:bg-primary hover:text-white rounded-xl"
+              >
+                Simulate Your Loan <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
             </div>
           ) : (
             <div className="h-full min-h-[400px] border-[2px] border-dashed border-border rounded-xl bg-surface/50 dark:bg-card/50 flex flex-col items-center justify-center text-muted-foreground p-8 text-center space-y-4">
               <FileText className="h-20 w-20 text-border" />
-              <p className="max-w-[300px] text-[20px] font-semibold">Results will safely appear here once analysis completes.</p>
+              <p className="max-w-[300px] text-[20px] font-semibold">
+                Results will appear here once you paste text and click Analyze.
+              </p>
             </div>
           )}
         </div>
