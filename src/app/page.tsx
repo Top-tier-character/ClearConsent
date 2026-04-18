@@ -7,18 +7,9 @@ export default function LandingPage() {
   return (
     <div className="overflow-hidden">
       {/* ── Hero ───────────────────────────────────────────────────────────── */}
-      <section
-        className="relative px-6 py-20 md:py-32 text-center flex flex-col items-center"
-        style={{ background: 'linear-gradient(180deg, #FAF9F6 0%, #ffffff 100%)' }}
-      >
+      <section className="relative px-6 py-20 md:py-32 text-center flex flex-col items-center bg-gradient-to-b from-background to-card dark:from-background dark:to-card">
         {/* Subtle radial background glow */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              'radial-gradient(ellipse 70% 50% at 50% 0%, rgba(27,42,74,0.06) 0%, transparent 70%)',
-          }}
-        />
+        <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_70%_50%_at_50%_0%,rgba(27,42,74,0.06)_0%,transparent_70%)] dark:bg-[radial-gradient(ellipse_70%_50%_at_50%_0%,rgba(255,255,255,0.03)_0%,transparent_70%)]" />
 
         <div className="relative max-w-4xl mx-auto flex flex-col items-center">
           <div className="inline-flex items-center gap-2 bg-success/10 text-success font-semibold text-[14px] px-4 py-1.5 rounded-full mb-6 border border-success/20">
@@ -36,10 +27,7 @@ export default function LandingPage() {
           {/* CTA buttons — visually distinct */}
           <div className="flex flex-col sm:flex-row justify-center gap-4 w-full sm:w-auto">
             <Link href="/analyze" className="w-full sm:w-auto">
-              <Button
-                className="w-full h-[52px] px-10 text-[18px] font-bold rounded-xl shadow-md transition-transform hover:-translate-y-1"
-                style={{ backgroundColor: '#1B2A4A', color: '#ffffff' }}
-              >
+              <Button className="w-full h-[52px] px-10 text-[18px] font-bold rounded-xl shadow-md transition-transform hover:-translate-y-1">
                 <FileSearch className="mr-2 h-6 w-6" />
                 Analyze a Financial Document
               </Button>
@@ -47,8 +35,7 @@ export default function LandingPage() {
             <Link href="/simulate" className="w-full sm:w-auto">
               <Button
                 variant="outline"
-                className="w-full h-[52px] px-10 text-[18px] font-bold rounded-xl shadow-sm transition-transform hover:-translate-y-1 bg-transparent"
-                style={{ border: '2px solid #1B2A4A', color: '#1B2A4A' }}
+                className="w-full h-[52px] px-10 text-[18px] font-bold rounded-xl shadow-sm transition-transform hover:-translate-y-1 bg-transparent border-2 border-primary text-primary dark:border-primary-foreground dark:text-primary-foreground"
               >
                 <Calculator className="mr-2 h-6 w-6" />
                 Simulate a Loan or EMI
@@ -172,10 +159,7 @@ export default function LandingPage() {
 
           <div className="flex justify-center mt-10">
             <Link href="/analyze">
-              <Button
-                className="h-[52px] px-10 text-[18px] font-bold rounded-xl shadow-md"
-                style={{ backgroundColor: '#1B2A4A', color: '#ffffff' }}
-              >
+              <Button className="h-[52px] px-10 text-[18px] font-bold rounded-xl shadow-md">
                 Get Started Now <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
