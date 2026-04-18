@@ -18,6 +18,12 @@ export const metadata: Metadata = {
   description: 'Understand financial terms before you sign. Predict risks and simulate loans.',
 };
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
