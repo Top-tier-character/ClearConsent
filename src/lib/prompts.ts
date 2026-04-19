@@ -42,7 +42,9 @@ export function buildAnalyzePrompt(documentText: string, language: Language): st
       ? documentText.slice(0, MAX_DOC_CHARS) + '\n[...document truncated — analyse the above excerpt]'
       : documentText;
 
-  return `You are a financial literacy expert helping low-income users in India understand financial agreements. All strings MUST be in ${lang}.
+  return `CRITICAL INSTRUCTION: You must respond ENTIRELY in ${lang}. Every single string value in your JSON response must be written in ${lang}. Do not use any other language.
+
+You are a financial literacy expert helping low-income users in India understand financial agreements. All strings MUST be in ${lang}.
 
 Here is the financial document:
 
@@ -59,7 +61,7 @@ Analyze this and return only the JSON object with exactly these fields:
 - "quiz": exactly 2 objects, each with "question" (string), "options" (array of 4 strings), "correct_answer" (string matching one option exactly) — test comprehension of THIS document's content
 - "extracted_figures": Look carefully through the document text for any financial figures. Extract these exact values if found — loan_amount (the principal amount being borrowed in rupees as a plain number with no commas or symbols), interest_rate (annual interest rate as a plain number, e.g. 12 for 12%), tenure_months (loan duration in months as a plain number — if given in years multiply by 12), monthly_income (any mentioned monthly income or salary as a plain number). If a value is not mentioned anywhere in the document set it to null. Never guess or estimate — only return values explicitly stated in the document. Shape: { "loan_amount": number|null, "interest_rate": number|null, "tenure_months": number|null, "monthly_income": number|null }
 
-All string values must be in ${lang}.
+REMINDER: Every string in your JSON response must be in ${lang} only. This is mandatory.
 
 ${JSON_ONLY_SUFFIX}`;
 }
@@ -97,7 +99,9 @@ export function buildSimulateNarrativePrompt(params: {
   const lang = LANGUAGE_NAMES[params.language];
   const { emi, totalRepayment, totalInterest, emiRatio, riskLevelValue, monthlyIncome, loanAmount, tenureMonths, annualRate } = params;
 
-  return `You are a financial counselor. Based on the loan data below, write a risk narrative and 3 advice tips in ${lang}.
+  return `CRITICAL INSTRUCTION: Respond entirely in ${lang}. Every string in your JSON must be in ${lang}.
+
+You are a financial counselor. Based on the loan data below, write a risk narrative and 3 advice tips in ${lang}.
 
 EMI: ₹${emi.toFixed(0)} | Total Repayment: ₹${totalRepayment.toFixed(0)} | Interest: ₹${totalInterest.toFixed(0)} | Income: ₹${monthlyIncome.toFixed(0)} | EMI/Income: ${emiRatio.toFixed(1)}% | Risk: ${riskLevelValue.toUpperCase()} | Loan: ₹${loanAmount.toFixed(0)} | Rate: ${annualRate}% | Tenure: ${tenureMonths}mo
 

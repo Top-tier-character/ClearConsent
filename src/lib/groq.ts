@@ -16,10 +16,10 @@ const groq = new Groq({
 export default groq;
 
 /** The model used for all Groq completions across every route.
- *  llama-3.1-8b-instant is Groq's fastest model — ~5-8x lower latency than the 70B.
- *  Switch back to 'llama3-70b-8192' for higher accuracy if speed is not a concern.
+ *  llama3-70b-8192 follows language and JSON instructions reliably.
+ *  Switch back to 'llama-3.1-8b-instant' for lower latency if accuracy is less critical.
  */
-export const GROQ_MODEL = 'llama-3.1-8b-instant';
+export const GROQ_MODEL = 'llama3-70b-8192';
 
 /** Maximum document characters sent to Groq. Truncating avoids huge prompts and speeds up inference. */
 export const MAX_DOC_CHARS = 4000;

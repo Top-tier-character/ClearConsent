@@ -63,6 +63,14 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'clearconsent-storage',
+      partialize: (state) => ({
+        history: state.history,
+        currentAnalysis: state.currentAnalysis,
+        currentSimulation: state.currentSimulation,
+        simulationPrefill: state.simulationPrefill,
+        user: state.user,
+        // language is intentionally excluded — always starts as 'en'
+      }),
     }
   )
 );
