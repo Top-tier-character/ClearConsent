@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { HelpCircle, ArrowRight, AlertTriangle, Scale, Loader2, RefreshCw } from 'lucide-react';
+import { HelpCircle, ArrowRight, AlertTriangle, Scale, Loader2, CheckCircle, X } from 'lucide-react';
 import { RiskMeter } from '@/components/RiskMeter';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
@@ -26,12 +26,17 @@ const formatCurrency = (val: number) =>
 
 export default function SimulatePage() {
   const router = useRouter();
-  const { setCurrentSimulation, addHistory, language } = useAppStore();
+  const { setCurrentSimulation, addHistory, language, simulationPrefill } = useAppStore();
 
-  // ── Inputs (blank on load — user must fill in) ────────────────────────────
+  // ── Inputs (blank on load — pre-filled from analyzed doc if available) ────
   const [inputs, setInputs] = useState({ amount: '', rate: '', tenure: '', income: '' });
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [incomeDrop, setIncomeDrop] = useState(0);
+
+  // ── Prefill banner ────────────────────────────────────────────────────────
+  const [showPrefillBanner, setShowPrefillBanner] = useState(false);
+  // Flag: after setting inputs from prefill, auto-trigger calculate
+  const [shouldAutoCalc, setShouldAutoCalc] = useState(false);
 
   // ── Server result + Groq narrative ───────────────────────────────────────
   const [serverResult, setServerResult] = useState<any | null>(null);
@@ -145,6 +150,40 @@ export default function SimulatePage() {
     }
   };
 
+  // ── Step 1: On mount, pre-fill inputs from analyzed document ─────────────
+  useEffect(() => {
+    if (simulationPrefill) {
+      const patch: Record<string, string> = {};
+      if (simulationPrefill.loan_amount) patch.amount = String(simulationPrefill.loan_amount);
+      if (simulationPrefill.interest_rate) patch.rate = String(simulationPrefill.interest_rate);
+      if (simulationPrefill.tenure_months) patch.tenure = String(simulationPrefill.tenure_months);
+      if (simulationPrefill.monthly_income) patch.income = String(simulationPrefill.monthly_income);
+
+      if (Object.keys(patch).length > 0) {
+        setInputs(prev => ({ ...prev, ...patch }));
+        setShowPrefillBanner(true);
+      }
+
+      // If all four are present, auto-calculate after the next render
+      if (
+        simulationPrefill.loan_amount &&
+        simulationPrefill.interest_rate &&
+        simulationPrefill.tenure_months &&
+        simulationPrefill.monthly_income
+      ) {
+        setShouldAutoCalc(true);
+      }
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Step 2: After inputs update from prefill, trigger calculate ───────────
+  useEffect(() => {
+    if (shouldAutoCalc) {
+      setShouldAutoCalc(false);
+      handleCalculate();
+    }
+  }, [shouldAutoCalc]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Proceed to confirm ────────────────────────────────────────────────────
   const handleProceed = async () => {
     if (!serverResult) return;
@@ -164,14 +203,33 @@ export default function SimulatePage() {
 
   // ── Risk score to show (Groq-verified if available, else local) ───────────
   const displayRiskScore = serverResult?.risk_score ?? localCalc?.riskScore ?? 0;
-  const displayEmiRatio = localCalc?.emiRatio ?? 0;
   const hasResults = !!serverResult;
 
   return (
     <div className="container mx-auto px-6 py-8 max-w-6xl">
-      <h1 className="text-[32px] font-bold text-primary dark:text-primary-foreground mb-8">
+      <h1 className="text-[32px] font-bold text-primary dark:text-primary-foreground mb-4">
         Simulate Your Loan or EMI
       </h1>
+
+      {/* ── Prefill banner ── */}
+      {showPrefillBanner && (
+        <div className="flex items-center justify-between gap-3 bg-success/10 border border-success/30 rounded-xl px-5 py-3 mb-6">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="h-5 w-5 text-success shrink-0" />
+            <p className="text-[15px] font-semibold text-success">
+              ✓ Values auto-filled from your document. You can adjust them if needed.
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowPrefillBanner(false)}
+            className="text-success hover:text-success/80 shrink-0 h-7 px-2"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
 
       {/* High-risk warning */}
       {localCalc && localCalc.emiRatio > 50 && (

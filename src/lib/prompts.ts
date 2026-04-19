@@ -42,22 +42,22 @@ export function buildAnalyzePrompt(documentText: string, language: Language): st
       ? documentText.slice(0, MAX_DOC_CHARS) + '\n[...document truncated — analyse the above excerpt]'
       : documentText;
 
-  return `You are a financial literacy expert helping low-income users in India understand financial agreements. Analyse the document below and return a JSON object. All strings MUST be in ${lang}.
+  return `You are a financial literacy expert helping low-income users in India understand financial agreements. All strings MUST be in ${lang}.
 
-DOCUMENT:
-"""
+Here is the financial document:
+
 ${truncated}
-"""
 
-Return JSON with exactly these fields:
+Analyze this and return only the JSON object with exactly these fields:
 - "pros": up to 5 short plain strings (benefits the user gets)
 - "cons": up to 5 short plain strings (fees or obligations)
 - "hidden_clauses": up to 4 strings (non-obvious traps, auto-renewals, penalties)
-- "callout_text": one string — if repayment figures exist: "In total you will pay back ₹X — that is ₹Y more than you borrowed", else a plain obligation summary
+- "callout_text": one string — read the actual document text and extract real rupee figures mentioned (principal, total repayment, total cost). Use those real numbers to write the sentence. Example: if document says loan of ₹50000 repaid as ₹57600 write "In total you will pay back ₹57,600 — that is ₹7,600 more than you borrowed". If no specific figures exist write a plain sentence about the biggest financial obligation. NEVER write ₹X or ₹Y or any placeholder — always use real numbers from the document
 - "risk_score": number 0-100 (0=safe, 100=very risky)
 - "risk_explanation": one plain sentence explaining the score
 - "summary": 2-3 plain sentences for someone who has never read a financial contract
 - "quiz": exactly 2 objects, each with "question" (string), "options" (array of 4 strings), "correct_answer" (string matching one option exactly) — test comprehension of THIS document's content
+- "extracted_figures": Look carefully through the document text for any financial figures. Extract these exact values if found — loan_amount (the principal amount being borrowed in rupees as a plain number with no commas or symbols), interest_rate (annual interest rate as a plain number, e.g. 12 for 12%), tenure_months (loan duration in months as a plain number — if given in years multiply by 12), monthly_income (any mentioned monthly income or salary as a plain number). If a value is not mentioned anywhere in the document set it to null. Never guess or estimate — only return values explicitly stated in the document. Shape: { "loan_amount": number|null, "interest_rate": number|null, "tenure_months": number|null, "monthly_income": number|null }
 
 All string values must be in ${lang}.
 

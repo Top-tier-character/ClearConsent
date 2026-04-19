@@ -6,9 +6,9 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  // Allow pdfjs-dist worker to be bundled
   webpack: (config) => {
     config.resolve.alias.canvas = false;
+    config.resolve.alias.encoding = false;
     return config;
   },
 };

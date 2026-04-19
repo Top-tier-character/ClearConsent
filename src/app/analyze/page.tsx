@@ -97,7 +97,7 @@ function ResultCard({
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function AnalyzePage() {
-  const { language, setLanguage, currentAnalysis, setCurrentAnalysis, addHistory } = useAppStore();
+  const { language, setLanguage, currentAnalysis, setCurrentAnalysis, addHistory, setSimulationPrefill } = useAppStore();
   const [text, setText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -142,6 +142,10 @@ export default function AnalyzePage() {
       };
 
       setCurrentAnalysis(result);
+      // Save extracted figures so the simulate page can auto-fill on mount
+      if (data.extracted_figures) {
+        setSimulationPrefill(data.extracted_figures);
+      }
       addHistory({
         id: result.id,
         type: 'analysis',
@@ -178,26 +182,26 @@ export default function AnalyzePage() {
         const content = await file.text();
         setText(content);
       } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-        // Dynamic import to avoid SSR issues with pdfjs-dist
-        const pdfjs = await import('pdfjs-dist');
-        // Point worker to the bundled worker file
-        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-          'pdfjs-dist/build/pdf.worker.min.mjs',
-          import.meta.url,
-        ).toString();
+        // Send the file to our server-side route — runs in Node.js,
+        // no browser worker needed, reliable across all Next.js versions.
+        const formData = new FormData();
+        formData.append('file', file);
 
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
-        let fullText = '';
-        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-          const page = await pdf.getPage(pageNum);
-          const content = await page.getTextContent();
-          const pageText = content.items
-            .map((item: any) => ('str' in item ? item.str : ''))
-            .join(' ');
-          fullText += pageText + '\n';
+        const res = await fetch('/api/extract-pdf', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.details || errData.error || `Server error ${res.status}`);
         }
-        setText(fullText.trim());
+
+        const { text: extracted } = await res.json();
+        if (!extracted || !extracted.trim()) {
+          throw new Error('No readable text found in this PDF. It may be a scanned image — please paste the text manually.');
+        }
+        setText(extracted);
       } else {
         setError('Unsupported file type. Please upload a .txt or .pdf file.');
         setUploadFileName(null);

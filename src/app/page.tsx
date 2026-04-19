@@ -43,7 +43,7 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          <div className="mt-8 flex items-center gap-2 text-muted-foreground font-semibold text-[15px] bg-muted/50 px-5 py-2.5 rounded-full">
+          <div className="mt-8 flex items-center gap-2 text-muted-foreground font-semibold text-[15px] bg-muted/50 dark:bg-[#1E293B]/50 px-5 py-2.5 rounded-full">
             <Lock className="h-5 w-5 text-success" />
             <span>Your data is private, encrypted, and never shared</span>
           </div>
@@ -98,7 +98,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── How it works ────────────────────────────────────────────────────── */}
-      <section className="bg-muted/30 py-16 px-6">
+      <section className="bg-muted/30 dark:bg-[#1E293B] py-16 px-6">
         <div className="container mx-auto max-w-5xl">
           <h2 className="text-[28px] md:text-[36px] font-bold text-center text-primary dark:text-primary-foreground mb-12">
             How It Works

@@ -18,7 +18,14 @@ export interface AnalyzeResult {
     options: [string, string, string, string];
     correct_answer: string;
   }[];
+  extracted_figures: {
+    loan_amount: number | null;
+    interest_rate: number | null;
+    tenure_months: number | null;
+    monthly_income: number | null;
+  };
 }
+
 
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
