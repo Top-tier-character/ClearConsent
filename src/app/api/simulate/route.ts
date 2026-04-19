@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import groq, { GROQ_MODEL } from '@/lib/groq';
+import groq, { GROQ_MODEL_FAST } from '@/lib/groq';
 import { parseGroqJson } from '@/lib/parseGroq';
 import { buildSimulateNarrativePrompt } from '@/lib/prompts';
 import {
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
     });
 
     const completion = await groq.chat.completions.create({
-      model: GROQ_MODEL,
+      model: GROQ_MODEL_FAST,
       messages: [{ role: 'user', content: narrativePrompt }],
       temperature: 0.5,
       max_tokens: 220,
