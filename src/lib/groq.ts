@@ -16,10 +16,10 @@ const groq = new Groq({
 export default groq;
 
 /** The model used for all Groq completions across every route.
- *  llama3-70b-8192 follows language and JSON instructions reliably.
- *  Switch back to 'llama-3.1-8b-instant' for lower latency if accuracy is less critical.
+ *  llama-3.3-70b-versatile is Groq's current 70B model (replaces decommissioned llama3-70b-8192).
+ *  Follows language and JSON instructions reliably.
  */
-export const GROQ_MODEL = 'llama3-70b-8192';
+export const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
 /** Maximum document characters sent to Groq. Truncating avoids huge prompts and speeds up inference. */
 export const MAX_DOC_CHARS = 4000;
