@@ -103,11 +103,15 @@ export default function AnalyzePage() {
   const [error, setError] = useState<string | null>(null);
   const [uploadFileName, setUploadFileName] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [pdfMeta, setPdfMeta] = useState<{ page_count: number; file_size_kb: number } | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const extractedTextRef = useRef<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
   // ── Core analyze call ──────────────────────────────────────────────────────
-  const runAnalysis = useCallback(async (docText: string, lang: Language) => {
+  const runAnalysis = useCallback(async (lang: Language) => {
+    const docText = extractedTextRef.current || text;
     if (!docText.trim()) {
       setError('Please paste document text or upload a file first.');
       return;
@@ -158,13 +162,14 @@ export default function AnalyzePage() {
     } finally {
       setIsLoading(false);
     }
-  }, [setCurrentAnalysis, addHistory]);
+  }, [text, setCurrentAnalysis, addHistory, setSimulationPrefill]);
 
   // ── Language change → re-run if results already showing ──────────────────
   const handleLanguageChange = (lang: Language) => {
     setLanguage(lang);
-    if (currentAnalysis && text.trim()) {
-      runAnalysis(text, lang);
+    const docText = extractedTextRef.current || text;
+    if (currentAnalysis && docText.trim()) {
+      runAnalysis(lang);
     }
   };
 
@@ -182,6 +187,7 @@ export default function AnalyzePage() {
         const content = await file.text();
         setText(content);
       } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+        setUploadedFile(file);
         // Send the file to our server-side route — runs in Node.js,
         // no browser worker needed, reliable across all Next.js versions.
         const formData = new FormData();
@@ -197,11 +203,13 @@ export default function AnalyzePage() {
           throw new Error(errData.details || errData.error || `Server error ${res.status}`);
         }
 
-        const { text: extracted } = await res.json();
+        const { text: extracted, page_count, file_size_kb } = await res.json();
         if (!extracted || !extracted.trim()) {
           throw new Error('No readable text found in this PDF. It may be a scanned image — please paste the text manually.');
         }
-        setText(extracted);
+        // Store extracted text silently — never show it in the textarea
+        extractedTextRef.current = extracted;
+        setPdfMeta({ page_count, file_size_kb });
       } else {
         setError('Unsupported file type. Please upload a .txt or .pdf file.');
         setUploadFileName(null);
@@ -220,6 +228,19 @@ export default function AnalyzePage() {
     setUploadFileName(null);
     setError(null);
     setCurrentAnalysis(null);
+    extractedTextRef.current = '';
+    setPdfMeta(null);
+    setUploadedFile(null);
+  };
+
+  const handlePreviewPdf = async () => {
+    if (!uploadedFile) return;
+    const formData = new FormData();
+    formData.append('file', uploadedFile);
+    const res = await fetch('/api/preview-pdf', { method: 'POST', body: formData });
+    const { base64_pdf } = await res.json();
+    const win = window.open();
+    win?.document.write(`<iframe src="data:application/pdf;base64,${base64_pdf}" width="100%" height="100%" style="border:none;position:fixed;top:0;left:0;"></iframe>`);
   };
 
   return (
@@ -267,17 +288,34 @@ export default function AnalyzePage() {
 
               {/* Upload button / file badge */}
               {uploadFileName ? (
-                <div className="flex items-center gap-3 w-full h-[48px] px-4 rounded-lg border border-success bg-success/10">
-                  <FileText className="h-5 w-5 text-success shrink-0" />
-                  <span className="text-[15px] font-semibold text-success truncate flex-1">{uploadFileName}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={clearUpload}
-                    className="text-muted-foreground hover:text-danger shrink-0 h-7 px-2"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-3 w-full h-[48px] px-4 rounded-lg border border-success bg-success/10">
+                    <FileText className="h-5 w-5 text-success shrink-0" />
+                    <span className="text-[15px] font-semibold text-success truncate flex-1">{uploadFileName}</span>
+                    {uploadedFile && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handlePreviewPdf}
+                        className="text-primary hover:text-primary/80 shrink-0 h-7 px-2 text-[13px] font-semibold"
+                      >
+                        View PDF
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearUpload}
+                      className="text-muted-foreground hover:text-danger shrink-0 h-7 px-2"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {pdfMeta && (
+                    <p className="text-[13px] text-muted-foreground px-1">
+                      {pdfMeta.page_count} pages · {pdfMeta.file_size_kb} KB
+                    </p>
+                  )}
                 </div>
               ) : (
                 <Button
@@ -296,11 +334,11 @@ export default function AnalyzePage() {
                 <div className="bg-danger/10 border-l-4 border-danger p-4 rounded-r text-danger font-semibold text-[15px] flex items-start justify-between gap-3">
                   <span>{error}</span>
                   <div className="flex items-center gap-2 shrink-0">
-                    {text.trim() && (
+                    {(text.trim() || extractedTextRef.current) && (
                       <Button
                         variant="link"
                         size="sm"
-                        onClick={() => runAnalysis(text, language)}
+                        onClick={() => runAnalysis(language)}
                         className="text-danger p-0 h-auto font-bold"
                       >
                         <RefreshCw className="h-4 w-4 mr-1" /> Retry
@@ -314,7 +352,7 @@ export default function AnalyzePage() {
               )}
 
               <Button
-                onClick={() => runAnalysis(text, language)}
+                onClick={() => runAnalysis(language)}
                 disabled={isLoading || isUploading}
                 className="w-full h-[52px] text-[20px] font-bold bg-primary hover:bg-primary/90 text-white rounded-xl disabled:opacity-60"
               >
