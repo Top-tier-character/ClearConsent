@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { RiskMeter } from '@/components/RiskMeter';
 import {
   Volume2, CheckCircle, AlertTriangle, UploadCloud, FileText,
-  ArrowRight, Loader2, RefreshCw, X,
+  ArrowRight, Loader2, RefreshCw, X, Eye,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -102,6 +102,8 @@ export default function AnalyzePage() {
   const [isUploading, setIsUploading] = useState(false);
   const [pdfMeta, setPdfMeta] = useState<{ page_count: number; file_size_kb: number } | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [pdfPreviewBase64, setPdfPreviewBase64] = useState<string | null>(null);
+  const [isPdfPreviewLoading, setIsPdfPreviewLoading] = useState(false);
   const extractedTextRef = useRef<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -228,16 +230,23 @@ export default function AnalyzePage() {
     extractedTextRef.current = '';
     setPdfMeta(null);
     setUploadedFile(null);
+    setPdfPreviewBase64(null);
   };
 
   const handlePreviewPdf = async () => {
     if (!uploadedFile) return;
-    const formData = new FormData();
-    formData.append('file', uploadedFile);
-    const res = await fetch('/api/preview-pdf', { method: 'POST', body: formData });
-    const { base64_pdf } = await res.json();
-    const win = window.open();
-    win?.document.write(`<iframe src="data:application/pdf;base64,${base64_pdf}" width="100%" height="100%" style="border:none;position:fixed;top:0;left:0;"></iframe>`);
+    setIsPdfPreviewLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', uploadedFile);
+      const res = await fetch('/api/preview-pdf', { method: 'POST', body: formData });
+      const { base64_pdf } = await res.json();
+      setPdfPreviewBase64(base64_pdf);
+    } catch {
+      setError('Could not load PDF preview.');
+    } finally {
+      setIsPdfPreviewLoading(false);
+    }
   };
 
   return (
@@ -283,9 +292,12 @@ export default function AnalyzePage() {
                         variant="ghost"
                         size="sm"
                         onClick={handlePreviewPdf}
+                        disabled={isPdfPreviewLoading}
                         className="text-primary hover:text-primary/80 shrink-0 h-7 px-2 text-[13px] font-semibold"
                       >
-                        View PDF
+                        {isPdfPreviewLoading
+                          ? <Loader2 className="h-4 w-4 animate-spin" />
+                          : <><Eye className="h-4 w-4 mr-1" />View PDF</>}
                       </Button>
                     )}
                     <Button
@@ -334,6 +346,24 @@ export default function AnalyzePage() {
                       Dismiss
                     </Button>
                   </div>
+                </div>
+              )}
+
+              {/* Inline PDF preview */}
+              {pdfPreviewBase64 && (
+                <div className="relative w-full rounded-xl border border-border overflow-hidden bg-card">
+                  <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30">
+                    <p className="text-[14px] font-semibold text-muted-foreground">📄 {uploadFileName}</p>
+                    <button onClick={() => setPdfPreviewBase64(null)} className="text-muted-foreground hover:text-danger">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <iframe
+                    src={`data:application/pdf;base64,${pdfPreviewBase64}`}
+                    className="w-full"
+                    style={{ height: 'clamp(350px, 50vw, 500px)', border: 'none' }}
+                    title="PDF Preview"
+                  />
                 </div>
               )}
 

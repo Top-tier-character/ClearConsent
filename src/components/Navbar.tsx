@@ -2,10 +2,10 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ShieldCheck, Moon, Sun, User, Menu, X } from 'lucide-react';
+import { ShieldCheck, Moon, Sun, User, Menu, X, Mail } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,16 @@ export function Navbar() {
   const { language, setLanguage, user, setUser } = useAppStore();
   const { theme, setTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-profile-panel]')) setProfileOpen(false);
+    };
+    if (profileOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [profileOpen]);
 
   const links = [
     { href: '/', label: 'Home' },
@@ -37,7 +47,7 @@ export function Navbar() {
   );
 
   return (
-    <nav className="border-b border-border bg-background/90 backdrop-blur-md sticky top-0 z-50">
+    <nav className="border-b border-border bg-background/90 backdrop-blur-md sticky top-0 z-50 relative">
       <div className="container mx-auto flex items-center justify-between h-[72px] px-4">
 
         {/* Left: Logo */}
@@ -90,8 +100,9 @@ export function Navbar() {
           {user ? (
             <Button
               variant="outline"
+              data-profile-panel
               className="rounded-full h-[44px] px-4 font-bold bg-card border-border hidden sm:flex items-center gap-2"
-              onClick={() => setUser(null)}
+              onClick={() => setProfileOpen(!profileOpen)}
             >
               <User className="h-[18px] w-[18px] text-success" />
               <span className="hidden md:inline">{user.name}</span>
@@ -120,6 +131,56 @@ export function Navbar() {
           </Button>
         </div>
       </div>
+
+      {/* Profile dropdown panel */}
+      {profileOpen && user && (
+        <div
+          data-profile-panel
+          className="absolute right-4 top-[76px] z-50 w-[300px] bg-card border border-border rounded-2xl shadow-xl p-6 flex flex-col gap-4"
+        >
+          <button onClick={() => setProfileOpen(false)} className="absolute top-3 right-3 text-muted-foreground hover:text-primary">
+            <X className="h-5 w-5" />
+          </button>
+          <div className="flex flex-col items-center gap-3 pb-4 border-b border-border">
+            <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-white text-[24px] font-bold">
+              {user.name?.charAt(0).toUpperCase() ?? 'U'}
+            </div>
+            <div className="text-center">
+              <p className="text-[18px] font-bold text-primary dark:text-primary-foreground">{user.name}</p>
+              <p className="text-[14px] text-muted-foreground">{user.email}</p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-xl">
+              <User className="h-5 w-5 text-muted-foreground shrink-0" />
+              <div>
+                <p className="text-[12px] text-muted-foreground font-semibold uppercase tracking-wide">Full Name</p>
+                <p className="text-[15px] font-semibold text-foreground">{user.name}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-xl">
+              <Mail className="h-5 w-5 text-muted-foreground shrink-0" />
+              <div>
+                <p className="text-[12px] text-muted-foreground font-semibold uppercase tracking-wide">Email</p>
+                <p className="text-[15px] font-semibold text-foreground break-all">{user.email}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-xl">
+              <ShieldCheck className="h-5 w-5 text-success shrink-0" />
+              <div>
+                <p className="text-[12px] text-muted-foreground font-semibold uppercase tracking-wide">Account Status</p>
+                <p className="text-[15px] font-semibold text-success">Verified</p>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => { setUser(null); setProfileOpen(false); }}
+            className="w-full h-[44px] rounded-xl border-2 border-danger text-danger font-bold text-[15px] hover:bg-danger hover:text-white transition-colors"
+          >
+            Sign Out
+          </button>
+        </div>
+      )}
 
       {/* Mobile drawer */}
       {mobileOpen && (
