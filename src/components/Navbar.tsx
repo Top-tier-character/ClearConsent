@@ -101,10 +101,10 @@ export function Navbar() {
             <Button
               variant="outline"
               data-profile-panel
-              className="rounded-full h-[44px] px-4 font-bold bg-card border-border hidden sm:flex items-center gap-2"
+              className="rounded-full h-[44px] w-[44px] sm:w-auto sm:px-4 font-bold bg-card border-border flex items-center gap-2"
               onClick={() => setProfileOpen(!profileOpen)}
             >
-              <User className="h-[18px] w-[18px] text-success" />
+              <User className="h-[18px] w-[18px] text-success shrink-0" />
               <span className="hidden md:inline">{user.name}</span>
             </Button>
           ) : (
@@ -136,7 +136,7 @@ export function Navbar() {
       {profileOpen && user && (
         <div
           data-profile-panel
-          className="absolute right-4 top-[76px] z-50 w-[300px] bg-card border border-border rounded-2xl shadow-xl p-6 flex flex-col gap-4"
+          className="absolute right-2 sm:right-4 top-[76px] z-50 w-[calc(100vw-16px)] sm:w-[300px] bg-card border border-border rounded-2xl shadow-xl p-6 flex flex-col gap-4"
         >
           <button onClick={() => setProfileOpen(false)} className="absolute top-3 right-3 text-muted-foreground hover:text-primary">
             <X className="h-5 w-5" />
