@@ -156,3 +156,29 @@ export const updateConsentStatus = mutation({
     }
   },
 });
+
+export const createUser = mutation({
+  args: {
+    email: v.string(),
+    name: v.string(),
+    password_hash: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Guard against duplicate emails
+    const existing = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .first();
+
+    if (existing) {
+      throw new Error("An account with this email already exists.");
+    }
+
+    return await ctx.db.insert("users", {
+      email: args.email,
+      name: args.name,
+      password_hash: args.password_hash,
+      created_at: Date.now(),
+    });
+  },
+});

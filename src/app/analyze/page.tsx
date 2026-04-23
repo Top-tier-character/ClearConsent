@@ -11,9 +11,6 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
 import type { Language } from '@/lib/store';
 
 // ─── Small read-aloud helper ──────────────────────────────────────────────────
@@ -245,21 +242,10 @@ export default function AnalyzePage() {
 
   return (
     <div className="container mx-auto px-6 py-8 max-w-6xl">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <div className="mb-8">
         <h1 className="text-[32px] font-bold text-primary dark:text-primary-foreground">
-          Understand Before You Sign
+          Analyze Your Document
         </h1>
-        {/* Language selector */}
-        <Select value={language} onValueChange={(v: any) => handleLanguageChange(v as Language)}>
-          <SelectTrigger className="w-[140px] h-[44px] font-semibold">
-            <SelectValue placeholder="Language" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="en">English</SelectItem>
-            <SelectItem value="hi">हिंदी</SelectItem>
-            <SelectItem value="mr">मराठी</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-10">

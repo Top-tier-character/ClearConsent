@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ShieldCheck, ArrowRight, Lock } from 'lucide-react';
+import { ShieldCheck, ArrowRight, Lock, Loader2 } from 'lucide-react';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -15,22 +15,28 @@ export default function SignupPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password || !name) return;
-    
-    setLoading(true);
-    // Mock creating account
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    setUser({
-      name: name,
-      email: email,
-    });
-    
-    router.push('/');
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, name }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Signup failed');
+      setUser({ id: data.session_id, name: data.name, email: data.email });
+      router.push('/');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Signup failed');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -86,12 +92,18 @@ export default function SignupPage() {
               />
             </div>
 
+            {error && (
+              <div className="bg-danger/10 border-l-4 border-danger p-3 rounded text-danger font-semibold text-[15px]">
+                {error}
+              </div>
+            )}
+
             <Button 
               type="submit" 
-              disabled={loading}
+              disabled={isLoading}
               className="w-full h-[52px] text-[18px] font-bold bg-primary hover:bg-primary/90 text-white rounded-xl mt-4 transition-transform hover:-translate-y-1"
             >
-              {loading ? 'Creating...' : 'Sign Up'} <ArrowRight className="ml-2 h-5 w-5" />
+              {isLoading ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Creating...</> : <>Sign Up <ArrowRight className="ml-2 h-5 w-5" /></>}
             </Button>
 
             <div className="pt-4 text-center text-[16px] text-muted-foreground">

@@ -60,4 +60,11 @@ export default defineSchema({
     whatif_scenarios: v.any(),
     resulted_in_consent: v.boolean(),
   }).index("by_session_id", ["session_id"]),
+
+  users: defineTable({
+    email: v.string(),
+    name: v.string(),
+    password_hash: v.string(),
+    created_at: v.number(),
+  }).index("by_email", ["email"]),
 });

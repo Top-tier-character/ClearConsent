@@ -140,6 +140,13 @@ export default function ConfirmPage() {
     return () => window.removeEventListener('keydown', handleEsc);
   }, []);
 
+  // ── Redirect if navigated directly with no data ────────────────────────────
+  useEffect(() => {
+    if (!currentAnalysis && !currentSimulation) {
+      router.replace('/analyze');
+    }
+  }, []);
+
   return (
     <div className="container mx-auto px-6 py-12 max-w-4xl relative">
       <h1 className="text-[32px] font-bold text-primary dark:text-primary-foreground mb-8">

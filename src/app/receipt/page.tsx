@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ShieldCheck, Download, Home, FileText } from 'lucide-react';
@@ -7,7 +9,15 @@ import { useAppStore } from '@/lib/store';
 import Link from 'next/link';
 
 export default function ReceiptPage() {
+  const router = useRouter();
   const { currentSimulation, currentAnalysis, language } = useAppStore();
+
+  // ── Redirect if navigated directly with no data ──────────────────────────
+  useEffect(() => {
+    if (!currentSimulation && !currentAnalysis) {
+      router.replace('/');
+    }
+  }, []);
 
   // consent_id, consent_summary, quiz_score and timestamp are written into
   // currentAnalysis by the confirm page immediately after /api/confirm responds.

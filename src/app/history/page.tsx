@@ -57,7 +57,8 @@ function getStatusBadge(riskLevel?: string, riskScore?: number) {
 }
 
 export default function HistoryPage() {
-  const { history } = useAppStore();
+  const { history, user } = useAppStore();
+  const sessionId = user?.id ?? 'guest-session';
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [filterType, setFilterType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -70,16 +71,6 @@ export default function HistoryPage() {
     setIsLoading(true);
     setFetchError(null);
     try {
-      // Use a stable session id from localStorage (created if absent)
-      let sessionId = '';
-      try {
-        sessionId = localStorage.getItem('cc_session_id') ?? '';
-        if (!sessionId) {
-          sessionId = `sess-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-          localStorage.setItem('cc_session_id', sessionId);
-        }
-      } catch { sessionId = 'default'; }
-
       const res = await fetch(`/api/history?session_id=${encodeURIComponent(sessionId)}`);
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json();
