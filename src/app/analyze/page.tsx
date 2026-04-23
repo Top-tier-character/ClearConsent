@@ -250,23 +250,23 @@ export default function AnalyzePage() {
   };
 
   return (
-    <div className="container mx-auto px-6 py-8 max-w-6xl">
-      <div className="mb-8">
-        <h1 className="text-[32px] font-bold text-primary dark:text-primary-foreground">
+    <div className="container mx-auto px-3 sm:px-6 py-6 sm:py-8 max-w-6xl">
+      <div className="mb-5 sm:mb-8">
+        <h1 className="text-[22px] sm:text-[28px] md:text-[32px] font-bold text-primary dark:text-primary-foreground">
           Analyze Your Document
         </h1>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-10">
+      <div className="grid lg:grid-cols-2 gap-5 lg:gap-10">
         {/* ── Input Column ── */}
         <div className="flex flex-col gap-4">
           <Card className="bg-surface dark:bg-card border-border shadow-sm rounded-xl border">
             <CardContent className="pt-6 flex flex-col gap-4">
-              <label className="text-[16px] font-semibold text-primary dark:text-primary-foreground">
+              <label className="text-[14px] sm:text-[16px] font-semibold text-primary dark:text-primary-foreground">
                 Paste your document text here
               </label>
               <textarea
-                className="flex min-h-[220px] w-full rounded-md border border-border bg-transparent px-4 py-3 text-[17px] placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary resize-y"
+                className="flex min-h-[140px] sm:min-h-[220px] w-full rounded-md border border-border bg-transparent px-3 sm:px-4 py-3 text-[15px] sm:text-[17px] placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary resize-y"
                 placeholder="Paste your loan agreement, insurance policy, or terms here…"
                 value={text}
                 onChange={(e) => setText(e.target.value)}
@@ -283,34 +283,37 @@ export default function AnalyzePage() {
 
               {/* Upload button / file badge */}
               {uploadFileName ? (
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-3 w-full h-[48px] px-4 rounded-lg border border-success bg-success/10">
+                <div className="flex flex-col gap-2">
+                  {/* Top row: icon + filename + action buttons */}
+                  <div className="flex items-center gap-2 w-full min-h-[48px] px-3 rounded-lg border border-success bg-success/10 flex-wrap py-2">
                     <FileText className="h-5 w-5 text-success shrink-0" />
-                    <span className="text-[15px] font-semibold text-success truncate flex-1">{uploadFileName}</span>
-                    {uploadedFile && (
+                    <span className="text-[13px] sm:text-[15px] font-semibold text-success truncate flex-1 min-w-0">{uploadFileName}</span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {uploadedFile && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handlePreviewPdf}
+                          disabled={isPdfPreviewLoading}
+                          className="text-primary hover:text-primary/80 h-7 px-2 text-[12px] sm:text-[13px] font-semibold"
+                        >
+                          {isPdfPreviewLoading
+                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                            : <><Eye className="h-4 w-4 mr-1" />View PDF</>}
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={handlePreviewPdf}
-                        disabled={isPdfPreviewLoading}
-                        className="text-primary hover:text-primary/80 shrink-0 h-7 px-2 text-[13px] font-semibold"
+                        onClick={clearUpload}
+                        className="text-muted-foreground hover:text-danger h-7 px-2"
                       >
-                        {isPdfPreviewLoading
-                          ? <Loader2 className="h-4 w-4 animate-spin" />
-                          : <><Eye className="h-4 w-4 mr-1" />View PDF</>}
+                        <X className="h-4 w-4" />
                       </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={clearUpload}
-                      className="text-muted-foreground hover:text-danger shrink-0 h-7 px-2"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                    </div>
                   </div>
                   {pdfMeta && (
-                    <p className="text-[13px] text-muted-foreground px-1">
+                    <p className="text-[12px] sm:text-[13px] text-muted-foreground px-1">
                       {pdfMeta.page_count} pages · {pdfMeta.file_size_kb} KB
                     </p>
                   )}
@@ -320,9 +323,9 @@ export default function AnalyzePage() {
                   variant="outline"
                   disabled={isUploading}
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full h-[48px] text-[17px] text-primary dark:text-primary-foreground font-semibold border-dashed border-2 bg-transparent hover:bg-muted"
+                  className="w-full h-[48px] text-[14px] sm:text-[17px] text-primary dark:text-primary-foreground font-semibold border-dashed border-2 bg-transparent hover:bg-muted"
                 >
-                  <UploadCloud className="mr-2 h-5 w-5" />
+                  <UploadCloud className="mr-2 h-5 w-5 shrink-0" />
                   {isUploading ? 'Reading file…' : 'Upload File (.pdf, .txt)'}
                 </Button>
               )}
@@ -352,16 +355,18 @@ export default function AnalyzePage() {
               {/* Inline PDF preview */}
               {pdfPreviewBase64 && (
                 <div className="relative w-full rounded-xl border border-border overflow-hidden bg-card">
-                  <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30">
-                    <p className="text-[14px] font-semibold text-muted-foreground">📄 {uploadFileName}</p>
-                    <button onClick={() => setPdfPreviewBase64(null)} className="text-muted-foreground hover:text-danger">
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30 gap-2">
+                    <p className="text-[13px] font-semibold text-muted-foreground truncate min-w-0">
+                      📄 {uploadFileName}
+                    </p>
+                    <button onClick={() => setPdfPreviewBase64(null)} className="text-muted-foreground hover:text-danger shrink-0">
                       <X className="h-4 w-4" />
                     </button>
                   </div>
                   <iframe
                     src={`data:application/pdf;base64,${pdfPreviewBase64}`}
-                    className="w-full"
-                    style={{ height: 'clamp(350px, 50vw, 500px)', border: 'none' }}
+                    className="w-full block"
+                    style={{ height: '65vh', minHeight: '300px', maxHeight: '520px', border: 'none' }}
                     title="PDF Preview"
                   />
                 </div>
@@ -370,7 +375,7 @@ export default function AnalyzePage() {
               <Button
                 onClick={() => runAnalysis(language)}
                 disabled={isLoading || isUploading}
-                className="w-full h-[52px] text-[20px] font-bold bg-primary hover:bg-primary/90 text-white rounded-xl disabled:opacity-60"
+                className="w-full h-[48px] sm:h-[52px] text-[17px] sm:text-[20px] font-bold bg-primary hover:bg-primary/90 text-white rounded-xl disabled:opacity-60"
               >
                 {isLoading
                   ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Analyzing…</>
