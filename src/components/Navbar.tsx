@@ -30,23 +30,10 @@ export function Navbar() {
   const links = [
     { href: '/', label: 'Home' },
     { href: '/analyze', label: 'Analyze' },
+    { href: '/history', label: 'My Documents' },
     { href: '/simulate', label: 'Simulate' },
-    { href: '/history', label: 'History' },
     ...(session?.user ? [{ href: '/dashboard', label: 'Dashboard' }] : []),
   ];
-
-  const LanguageDropdown = ({ compact }: { compact?: boolean }) => (
-    <Select value={language} onValueChange={(val: any) => setLanguage(val)}>
-      <SelectTrigger className={cn('font-semibold', compact ? 'w-[90px] h-[40px] text-xs px-2' : 'w-[120px] h-[40px]')}>
-        <SelectValue placeholder={compact ? 'Lang' : 'Language'} />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="en">English</SelectItem>
-        <SelectItem value="hi">हिन्दी</SelectItem>
-        <SelectItem value="mr">मराठी</SelectItem>
-      </SelectContent>
-    </Select>
-  );
 
   return (
     <nav className={cn(
@@ -84,10 +71,7 @@ export function Navbar() {
 
         {/* Right: Language (desktop) + theme + login + hamburger (mobile) */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Language selector — desktop only */}
-          <div className="hidden lg:block">
-            <LanguageDropdown />
-          </div>
+          {/* Language selector removed */}
 
           {/* Theme toggle */}
           <Button
@@ -194,14 +178,7 @@ export function Navbar() {
               })}
             </div>
 
-            {/* Language */}
-            <div className="space-y-2">
-              <p className="text-[12px] uppercase font-bold text-muted-foreground tracking-wider mb-2 px-2">Preferences</p>
-              <div className="bg-card p-4 rounded-xl border-[2px] border-border flex items-center justify-between">
-                <span className="font-bold text-primary dark:text-primary-foreground">Language</span>
-                <LanguageDropdown />
-              </div>
-            </div>
+
 
           </div>
         </div>

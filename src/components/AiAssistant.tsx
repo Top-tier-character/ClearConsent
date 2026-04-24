@@ -5,9 +5,10 @@ import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { MessageSquare, X, Send, Bot, User, Loader2, Minimize2 } from 'lucide-react';
+import { MessageSquare, X, Send, Bot, User, Loader2, Minimize2, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ChatMessage } from '@/lib/store';
+import { toast } from 'sonner';
 
 export function AiAssistant() {
   const { chatHistory, addChatMessage, clearChatHistory, currentAnalysis, currentSimulation, language } = useAppStore();
@@ -147,12 +148,24 @@ export function AiAssistant() {
               chatHistory.map((msg, idx) => (
                 <div key={idx} className={cn("flex", msg.role === 'user' ? "justify-end" : "justify-start")}>
                   <div className={cn(
-                    "max-w-[85%] rounded-2xl px-4 py-2.5 text-[14px]",
+                    "max-w-[85%] rounded-2xl px-4 py-2.5 text-[14px] group relative",
                     msg.role === 'user' 
                       ? "bg-primary text-white rounded-br-sm" 
                       : "bg-surface dark:bg-background border border-border text-foreground rounded-bl-sm shadow-sm"
                   )}>
                     {msg.content}
+                    {msg.role === 'assistant' && (
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(msg.content);
+                          toast('Copied to clipboard');
+                        }}
+                        className="absolute -right-8 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-muted-foreground hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Copy response"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))

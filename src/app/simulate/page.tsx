@@ -13,6 +13,7 @@ import { RiskMeter } from '@/components/RiskMeter';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface FieldErrors {
   amount?: string;
@@ -193,7 +194,7 @@ export default function SimulatePage() {
       const rec = { ...numericInputs, ...serverResult, id: `SIM-${Date.now()}` };
       setCurrentSimulation(rec);
       addHistory({ id: rec.id, type: 'simulation', date: new Date().toISOString(), riskScore: Math.round(serverResult.risk_score ?? 0), details: rec });
-      router.push('/confirm');
+      toast('Simulation saved to My Documents!');
     } catch (err) {
       setProceedError(err instanceof Error ? err.message : 'Failed to proceed.');
     } finally {
@@ -207,6 +208,14 @@ export default function SimulatePage() {
 
   return (
     <div className="container mx-auto px-6 py-8 max-w-6xl">
+      <div className="bg-[#1B2A4A] text-white p-4 rounded-xl mb-6 shadow-sm flex items-start gap-3">
+        <HelpCircle className="h-6 w-6 shrink-0 mt-0.5 text-warning" />
+        <div>
+          <p className="font-bold text-lg">💡 Have a document?</p>
+          <p className="text-sm text-muted-foreground text-blue-100">If you have a loan document, analyze it on the Analyze page — these numbers will be filled automatically for you.</p>
+        </div>
+      </div>
+
       <h1 className="text-[32px] font-bold text-primary dark:text-primary-foreground mb-4">
         Simulate Your Loan or EMI
       </h1>
@@ -517,11 +526,11 @@ export default function SimulatePage() {
                 <Button
                   onClick={handleProceed}
                   disabled={isProceedLoading}
-                  className="w-full h-[52px] text-[18px] font-bold bg-primary hover:bg-primary/90 text-white rounded-xl disabled:opacity-60"
+                  className="w-full h-[52px] text-[18px] font-bold bg-[#1B2A4A] hover:bg-[#1B2A4A]/90 text-white rounded-xl disabled:opacity-60"
                 >
                   {isProceedLoading
-                    ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Processing…</>
-                    : <>Go to Confirmation <ArrowRight className="ml-2 h-5 w-5" /></>}
+                    ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Saving…</>
+                    : <>Save This Simulation <CheckCircle className="ml-2 h-5 w-5" /></>}
                 </Button>
               ) : (
                 <Button

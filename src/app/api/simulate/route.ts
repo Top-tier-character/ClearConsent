@@ -16,7 +16,7 @@ import {
   type RiskLevel,
 } from '@/lib/finance';
 import type { Language } from '@/lib/store';
-import { convex } from '@/lib/convex';
+import { convexClient } from '@/lib/convex';
 import { api } from '../../../../convex/_generated/api';
 
 interface SimulateBody {
@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
 
     // ── 7. Save risk log ───────────────────────────────────────────────────
     if (body.session_id) {
-      await convex.mutation(api.mutations.saveRiskLog, {
+      await convexClient().mutation(api.mutations.saveRiskLog, {
         session_id: String(body.session_id),
         timestamp: Date.now(),
         loan_amount,

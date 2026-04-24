@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileSearch, Calculator, CheckCircle, ArrowRight, Lock, Upload, Brain, ShieldCheck } from 'lucide-react';
+import { ShieldAlert, ArrowRight, Lock, Brain, FileWarning, Search, Zap } from 'lucide-react';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
 
@@ -10,180 +10,116 @@ export default async function LandingPage() {
   try {
     session = await getServerSession(authOptions);
   } catch (err) {
-    // NextAuth misconfiguration (missing secret, bad Google creds, etc.) must not
-    // crash the entire homepage — log it and continue as unauthenticated.
     console.error('[authOptions] getServerSession failed:', err);
   }
 
   return (
-    <div className="overflow-hidden">
+    <div className="overflow-hidden bg-[#FAF9F6] dark:bg-background">
       {/* ── Hero ───────────────────────────────────────────────────────────── */}
-      <section className="relative px-4 sm:px-6 py-14 md:py-28 text-center flex flex-col items-center bg-gradient-to-b from-background to-card dark:from-background dark:to-card">
+      <section className="relative px-4 sm:px-6 py-20 md:py-32 text-center flex flex-col items-center">
         {/* Subtle radial background glow */}
         <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_70%_50%_at_50%_0%,rgba(27,42,74,0.06)_0%,transparent_70%)] dark:bg-[radial-gradient(ellipse_70%_50%_at_50%_0%,rgba(255,255,255,0.03)_0%,transparent_70%)]" />
 
         <div className="relative w-full max-w-4xl mx-auto flex flex-col items-center">
-          <div className="inline-flex items-center gap-2 bg-success/10 text-success font-semibold text-[12px] sm:text-[14px] px-3 py-1.5 rounded-full mb-5 border border-success/20">
-            <ShieldCheck className="h-4 w-4 shrink-0" /> Trusted Financial Decision Assistant
+          <div className="inline-flex items-center gap-2 bg-[#1B2A4A]/10 dark:bg-white/10 text-[#1B2A4A] dark:text-white font-black text-xs uppercase tracking-widest px-4 py-2 rounded-full mb-8 border border-[#1B2A4A]/20 dark:border-white/20">
+            <ShieldAlert className="h-4 w-4 shrink-0 text-red-500" /> The Anti-Predatory Lending Tool
           </div>
 
-          <h1 className="text-[28px] sm:text-[36px] md:text-[56px] font-bold text-primary dark:text-primary-foreground tracking-tight mb-4 leading-tight px-2">
-            Understand Before You Sign
+          <h1 className="text-[40px] sm:text-[56px] md:text-[72px] font-black text-[#1B2A4A] dark:text-white tracking-tight mb-6 leading-[1.1] px-2">
+            The only loan analyzer that works for <span className="text-red-500 underline decoration-4 underline-offset-8">you</span>, not the bank.
           </h1>
-          <p className="text-[15px] sm:text-[17px] md:text-[20px] text-muted-foreground mb-8 leading-relaxed max-w-2xl px-2">
-            We translate confusing legal documents into plain language, calculate your actual loan costs,
-            and check for hidden risks — before you make a commitment.
+          <p className="text-lg sm:text-xl md:text-2xl text-muted-foreground font-medium mb-12 max-w-2xl px-2">
+            Upload any contract. We'll find the hidden traps, predatory clauses, and true costs in 5 seconds. Don't sign blindly.
           </p>
 
           {/* CTA buttons */}
-          <div className="flex flex-col sm:flex-row justify-center gap-3 w-full max-w-lg sm:w-auto">
+          <div className="flex justify-center w-full max-w-lg sm:w-auto">
             {session?.user ? (
-              <Link href="/dashboard" className="w-full sm:w-auto">
-                <Button className="w-full h-[48px] px-6 sm:px-10 text-[15px] sm:text-[17px] font-bold rounded-xl shadow-md transition-transform hover:-translate-y-1">
-                  <ArrowRight className="mr-2 h-5 w-5 shrink-0" />
-                  Go to Dashboard
+              <Link href="/analyze" className="w-full sm:w-auto">
+                <Button className="w-full h-16 px-10 text-xl font-black rounded-2xl shadow-lg transition-transform hover:-translate-y-1 bg-[#1B2A4A] hover:bg-[#1B2A4A]/90 text-white">
+                  <Search className="mr-3 h-6 w-6 shrink-0" />
+                  Analyze a Document Now
                 </Button>
               </Link>
             ) : (
               <Link href="/analyze" className="w-full sm:w-auto">
-                <Button className="w-full h-[48px] px-6 sm:px-10 text-[15px] sm:text-[17px] font-bold rounded-xl shadow-md transition-transform hover:-translate-y-1">
-                  <FileSearch className="mr-2 h-5 w-5 shrink-0" />
-                  Analyze a Financial Document
+                <Button className="w-full h-16 px-10 text-xl font-black rounded-2xl shadow-lg transition-transform hover:-translate-y-1 bg-[#1B2A4A] hover:bg-[#1B2A4A]/90 text-white">
+                  <Search className="mr-3 h-6 w-6 shrink-0" />
+                  Analyze a Document for Free
                 </Button>
               </Link>
             )}
-            <Link href="/simulate" className="w-full sm:w-auto">
-              <Button
-                variant="outline"
-                className="w-full h-[48px] px-6 sm:px-10 text-[15px] sm:text-[17px] font-bold rounded-xl shadow-sm transition-transform hover:-translate-y-1 bg-transparent border-2 border-primary text-primary dark:border-primary-foreground dark:text-primary-foreground"
-              >
-                <Calculator className="mr-2 h-5 w-5 shrink-0" />
-                Simulate a Loan or EMI
-              </Button>
-            </Link>
           </div>
 
-          <div className="mt-6 flex items-center gap-2 text-muted-foreground font-semibold text-[13px] sm:text-[14px] bg-muted/50 dark:bg-[#1E293B]/50 px-4 py-2 rounded-full max-w-xs sm:max-w-none text-center">
-            <Lock className="h-4 w-4 text-success shrink-0" />
-            <span>Your data is private, encrypted, and never shared</span>
+          <div className="mt-8 flex items-center justify-center gap-2 text-muted-foreground font-bold text-sm bg-black/5 dark:bg-white/5 px-6 py-3 rounded-full">
+            <Lock className="h-4 w-4 text-green-600 shrink-0" />
+            <span>Your documents are analyzed privately and instantly deleted.</span>
           </div>
         </div>
       </section>
 
       {/* ── Feature cards ──────────────────────────────────────────────────── */}
-      <section className="w-full px-4 sm:px-6 py-14">
+      <section className="w-full px-4 sm:px-6 py-20 bg-white dark:bg-[#0F172A] border-y border-border">
         <div className="container mx-auto max-w-6xl">
-        <h2 className="text-[22px] sm:text-[28px] md:text-[36px] font-bold text-center text-primary dark:text-primary-foreground mb-8 sm:mb-12">
-          Everything you need to decide with confidence
-        </h2>
-        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6">
-          {/* Card 1 */}
-          <Card className="border-[2px] border-border bg-surface dark:bg-card shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200 pt-4 rounded-2xl">
-            <CardHeader className="text-center pb-4">
-              <div className="mx-auto bg-primary/10 w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mb-4 text-[30px] sm:text-[36px]">
-                📄
-              </div>
-              <CardTitle className="text-[18px] sm:text-[22px] font-bold text-primary dark:text-primary-foreground">Simplify Terms</CardTitle>
-            </CardHeader>
-            <CardContent className="text-center text-muted-foreground text-[15px] sm:text-[17px] px-5 pb-6">
-              Upload your agreement or paste the text. We instantly show you the clear benefits and obligations in plain language.
-            </CardContent>
-          </Card>
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-8">
+            
+            {/* Card 1 */}
+            <Card className="border-2 border-border shadow-sm hover:border-[#1B2A4A] transition-all duration-200 pt-6 rounded-3xl bg-[#FAF9F6] dark:bg-card">
+              <CardHeader className="text-center pb-4">
+                <div className="mx-auto bg-red-100 dark:bg-red-900/30 w-20 h-20 rounded-full flex items-center justify-center mb-6">
+                  <FileWarning className="h-10 w-10 text-red-600 dark:text-red-400" />
+                </div>
+                <CardTitle className="text-2xl font-black text-[#1B2A4A] dark:text-white">Red Flag Finder</CardTitle>
+              </CardHeader>
+              <CardContent className="text-center text-muted-foreground text-[17px] font-medium px-6 pb-8">
+                We instantly scan for aggressive late fees, variable interest rate traps, and unfair repossession clauses buried in the fine print.
+              </CardContent>
+            </Card>
 
-          {/* Card 2 */}
-          <Card className="border-[2px] border-border bg-surface dark:bg-card shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200 pt-4 rounded-2xl">
-            <CardHeader className="text-center pb-4">
-              <div className="mx-auto bg-warning/10 w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mb-4 text-[30px] sm:text-[36px]">
-                📊
-              </div>
-              <CardTitle className="text-[18px] sm:text-[22px] font-bold text-primary dark:text-primary-foreground">Predict Risk</CardTitle>
-            </CardHeader>
-            <CardContent className="text-center text-muted-foreground text-[15px] sm:text-[17px] px-5 pb-6">
-              Calculate exactly how much extra money you will pay and verify if the monthly cost is safe for your income.
-            </CardContent>
-          </Card>
+            {/* Card 2 */}
+            <Card className="border-2 border-border shadow-sm hover:border-[#1B2A4A] transition-all duration-200 pt-6 rounded-3xl bg-[#FAF9F6] dark:bg-card">
+              <CardHeader className="text-center pb-4">
+                <div className="mx-auto bg-orange-100 dark:bg-orange-900/30 w-20 h-20 rounded-full flex items-center justify-center mb-6">
+                  <Zap className="h-10 w-10 text-orange-600 dark:text-orange-400" />
+                </div>
+                <CardTitle className="text-2xl font-black text-[#1B2A4A] dark:text-white">Action Plan Generator</CardTitle>
+              </CardHeader>
+              <CardContent className="text-center text-muted-foreground text-[17px] font-medium px-6 pb-8">
+                Don't just find out what's wrong—know how to fix it. We generate exact email templates you can send to your lender to negotiate better terms.
+              </CardContent>
+            </Card>
 
-          {/* Card 3 */}
-          <Card className="border-[2px] border-border bg-surface dark:bg-card shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200 pt-4 rounded-2xl sm:col-span-2 md:col-span-1">
-            <CardHeader className="text-center pb-4">
-              <div className="mx-auto bg-success/10 w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mb-4 text-[30px] sm:text-[36px]">
-                ✅
-              </div>
-              <CardTitle className="text-[18px] sm:text-[22px] font-bold text-primary dark:text-primary-foreground">Confirm with Confidence</CardTitle>
-            </CardHeader>
-            <CardContent className="text-center text-muted-foreground text-[15px] sm:text-[17px] px-5 pb-6">
-              Pass a quick comprehension check, confirm you understand the facts, and generate a secure digital receipt.
-            </CardContent>
-          </Card>
-        </div>
+            {/* Card 3 */}
+            <Card className="border-2 border-border shadow-sm hover:border-[#1B2A4A] transition-all duration-200 pt-6 rounded-3xl bg-[#FAF9F6] dark:bg-card sm:col-span-2 md:col-span-1">
+              <CardHeader className="text-center pb-4">
+                <div className="mx-auto bg-blue-100 dark:bg-blue-900/30 w-20 h-20 rounded-full flex items-center justify-center mb-6">
+                  <Brain className="h-10 w-10 text-blue-600 dark:text-blue-400" />
+                </div>
+                <CardTitle className="text-2xl font-black text-[#1B2A4A] dark:text-white">True Cost Calculator</CardTitle>
+              </CardHeader>
+              <CardContent className="text-center text-muted-foreground text-[17px] font-medium px-6 pb-8">
+                We extract the numbers directly from the document to show you exactly how much extra money the bank is taking over time.
+              </CardContent>
+            </Card>
+
+          </div>
         </div>
       </section>
 
-      {/* ── How it works ────────────────────────────────────────────────────── */}
-      <section className="bg-muted/30 dark:bg-[#1E293B] py-12 sm:py-16 px-4 sm:px-6">
-        <div className="container mx-auto max-w-5xl">
-          <h2 className="text-[22px] sm:text-[28px] md:text-[36px] font-bold text-center text-primary dark:text-primary-foreground mb-10">
-            How It Works
+      {/* ── CTA Bottom ────────────────────────────────────────────────────── */}
+      <section className="bg-[#1B2A4A] py-24 px-4 sm:px-6">
+        <div className="container mx-auto max-w-4xl text-center">
+          <h2 className="text-4xl md:text-5xl font-black text-white mb-8">
+            Protect yourself before you sign.
           </h2>
-          <div className="flex flex-col md:flex-row items-center justify-center gap-0">
-            {/* Step 1 */}
-            <div className="flex-1 flex flex-col items-center text-center px-4 py-6">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-primary flex items-center justify-center mb-4 shadow-lg">
-                <Upload className="h-7 w-7 sm:h-9 sm:w-9 text-white" />
-              </div>
-              <div className="text-[12px] uppercase font-bold tracking-wider text-muted-foreground mb-1">Step 1</div>
-              <h3 className="text-[18px] sm:text-[22px] font-bold text-primary dark:text-primary-foreground mb-2">Upload</h3>
-              <p className="text-[14px] sm:text-[16px] text-muted-foreground max-w-[220px]">
-                Paste your document text or upload a PDF or TXT file.
-              </p>
-            </div>
-
-            <div className="hidden md:flex items-center text-muted-foreground shrink-0">
-              <ArrowRight className="h-8 w-8" />
-            </div>
-            <div className="md:hidden text-muted-foreground my-1">
-              <ArrowRight className="h-5 w-5 rotate-90" />
-            </div>
-
-            {/* Step 2 */}
-            <div className="flex-1 flex flex-col items-center text-center px-4 py-6">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-warning flex items-center justify-center mb-4 shadow-lg">
-                <Brain className="h-7 w-7 sm:h-9 sm:w-9 text-white" />
-              </div>
-              <div className="text-[12px] uppercase font-bold tracking-wider text-muted-foreground mb-1">Step 2</div>
-              <h3 className="text-[18px] sm:text-[22px] font-bold text-primary dark:text-primary-foreground mb-2">Understand</h3>
-              <p className="text-[14px] sm:text-[16px] text-muted-foreground max-w-[220px]">
-                Our AI breaks down complex terms into simple, plain-language explanations.
-              </p>
-            </div>
-
-            <div className="hidden md:flex items-center text-muted-foreground shrink-0">
-              <ArrowRight className="h-8 w-8" />
-            </div>
-            <div className="md:hidden text-muted-foreground my-1">
-              <ArrowRight className="h-5 w-5 rotate-90" />
-            </div>
-
-            {/* Step 3 */}
-            <div className="flex-1 flex flex-col items-center text-center px-4 py-6">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-success flex items-center justify-center mb-4 shadow-lg">
-                <CheckCircle className="h-7 w-7 sm:h-9 sm:w-9 text-white" />
-              </div>
-              <div className="text-[12px] uppercase font-bold tracking-wider text-muted-foreground mb-1">Step 3</div>
-              <h3 className="text-[18px] sm:text-[22px] font-bold text-primary dark:text-primary-foreground mb-2">Confirm</h3>
-              <p className="text-[14px] sm:text-[16px] text-muted-foreground max-w-[220px]">
-                Confirm your understanding and receive a secure, verifiable consent record.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex justify-center mt-8">
-            <Link href="/analyze">
-              <Button className="h-[48px] px-8 text-[16px] sm:text-[18px] font-bold rounded-xl shadow-md">
-                Get Started Now <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
-          </div>
+          <p className="text-xl text-blue-200 mb-10 max-w-2xl mx-auto font-medium">
+            Join thousands of users who are using ClearConsent to level the playing field against predatory financial institutions.
+          </p>
+          <Link href="/analyze">
+            <Button className="h-16 px-12 text-xl font-black rounded-2xl bg-white text-[#1B2A4A] hover:bg-gray-100 shadow-xl transition-transform hover:-translate-y-1">
+              Start Your Free Analysis <ArrowRight className="ml-3 h-6 w-6" />
+            </Button>
+          </Link>
         </div>
       </section>
     </div>

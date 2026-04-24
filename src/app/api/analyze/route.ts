@@ -1,119 +1,116 @@
+export const runtime = 'nodejs';
+
 import { NextRequest, NextResponse } from 'next/server';
 import groq, { GROQ_MODEL } from '@/lib/groq';
 import { parseGroqJson } from '@/lib/parseGroq';
-import { buildAnalyzePrompt, buildAnalyzeRetryPrompt } from '@/lib/prompts';
+import { buildAnalyzePrompt } from '@/lib/prompts';
 import type { Language } from '@/lib/store';
-
-// Shape of the structured JSON Groq returns for document analysis
-export interface SpecificClause {
-  quote: string;
-  explanation: string;
-  severity: 'high' | 'medium' | 'low';
-}
-
-export interface AnalyzeResult {
-  document_type: string;
-  pros: string[];
-  cons: string[];
-  hidden_clauses: string[];
-  specific_clauses: SpecificClause[];
-  callout_text: string;
-  risk_score: number;
-  risk_explanation: string;
-  summary: string;
-  quiz: {
-    question: string;
-    options: [string, string, string, string];
-    correct_answer: string;
-  }[];
-  extracted_figures: {
-    loan_amount: number | null;
-    interest_rate: number | null;
-    tenure_months: number | null;
-    monthly_income: number | null;
-  };
-}
 
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
-
   try {
-    // ── 1. Parse body ──────────────────────────────────────────────────────
-    let body: { text?: unknown; language?: unknown; simplified?: unknown };
-    try {
-      body = await req.json();
-    } catch {
-      return NextResponse.json(
-        { error: 'Invalid request body', details: 'Request body must be valid JSON.' },
-        { status: 400, headers: { 'X-Response-Time': `${Date.now() - startTime}ms` } }
-      );
-    }
-
-    // ── 2. Validate ────────────────────────────────────────────────────────
-    if (!body.text || typeof body.text !== 'string' || !body.text.trim()) {
-      return NextResponse.json(
-        { error: 'Missing required field', details: 'text is required and must be a non-empty string.' },
-        { status: 400, headers: { 'X-Response-Time': `${Date.now() - startTime}ms` } }
-      );
-    }
-
-    const text = (body.text as string).trim();
-    const language: Language =
-      body.language === 'hi' || body.language === 'mr' ? (body.language as Language) : 'en';
+    const body = await req.json().catch(() => ({}));
+    const text = typeof body.text === 'string' ? body.text.trim() : '';
+    const language: Language = (['hi', 'mr'] as const).includes(body.language) ? body.language : 'en';
     const simplified = body.simplified === true;
 
-    // ── 3. Groq call (with one retry on parse failure) ─────────────────────
-    let result: AnalyzeResult;
+    if (!text) {
+      return NextResponse.json({ error: 'text is required' }, { status: 400 });
+    }
 
-    const attempt = async (retry: boolean): Promise<string> => {
-      const systemPrompt = buildAnalyzePrompt(text, language, simplified);
-      const userPrompt = retry
-        ? `IMPORTANT: Return ONLY valid JSON. No markdown. No explanation.\n\nAnalyze this document:\n"""\n${text.slice(0, 6000)}\n"""`
-        : `Analyze this document and return the JSON:\n"""\n${text.slice(0, 6000)}\n"""`;
+    const systemPrompt = buildAnalyzePrompt(text, language, simplified);
+    const langName = language === 'hi' ? 'Hindi' : language === 'mr' ? 'Marathi' : 'English';
 
-      const completion = await groq.chat.completions.create({
-        model: GROQ_MODEL,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.2,
-        max_tokens: 2048,
-      });
+    let result: any = null;
+    let lastError = '';
 
-      return completion.choices[0]?.message?.content ?? '';
-    };
-
-    let rawResponse = await attempt(false);
-
-    try {
-      result = parseGroqJson<AnalyzeResult>(rawResponse);
-    } catch {
-      rawResponse = await attempt(true);
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        result = parseGroqJson<AnalyzeResult>(rawResponse);
-      } catch (retryErr) {
-        return NextResponse.json(
-          {
-            error: 'AI response parsing failed',
-            details: `Could not parse AI response as JSON after two attempts. ${retryErr instanceof Error ? retryErr.message : String(retryErr)}`,
-          },
-          { status: 500, headers: { 'X-Response-Time': `${Date.now() - startTime}ms` } }
-        );
+        const completion = await groq.chat.completions.create({
+          model: GROQ_MODEL,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            {
+              role: 'user',
+              content: `Analyze the document and return the JSON object now. Respond in ${langName}.`,
+            },
+          ],
+          temperature: attempt === 0 ? 0.2 : 0.1,
+          max_tokens: 2500,
+        });
+        const raw = completion.choices[0]?.message?.content ?? '';
+        result = parseGroqJson(raw);
+        break;
+      } catch (e) {
+        lastError = String(e);
+        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
       }
     }
 
-    // ── 4. Return ──────────────────────────────────────────────────────────
-    return NextResponse.json(result, {
-      status: 200,
+    if (!result) {
+      return NextResponse.json(
+        { error: 'Analysis failed after 3 attempts', details: lastError },
+        { status: 500, headers: { 'X-Response-Time': `${Date.now() - startTime}ms` } }
+      );
+    }
+
+    // risk_flags (new schema) or specific_clauses (old schema) — both are supported
+    const riskFlags: any[] = Array.isArray(result.risk_flags)
+      ? result.risk_flags
+      : Array.isArray(result.specific_clauses)
+      ? result.specific_clauses
+      : [];
+
+    // clearconsent_score = 100 means fully safe → riskScore = 0
+    // clearconsent_score = 0 means predatory  → riskScore = 100
+    const riskScore =
+      typeof result.clearconsent_score === 'number'
+        ? Math.min(100, Math.max(0, 100 - result.clearconsent_score))
+        : typeof result.risk_score === 'number'
+        ? Math.min(100, Math.max(0, result.risk_score))
+        : 50;
+
+    const safe = {
+      document_type:
+        typeof result.document_type === 'string' ? result.document_type : 'Financial Document',
+      risk_score: riskScore,
+      risk_explanation:
+        typeof result.score_explanation === 'string'
+          ? result.score_explanation
+          : typeof result.risk_explanation === 'string'
+          ? result.risk_explanation
+          : '',
+      pros: Array.isArray(result.pros) ? result.pros.filter((x: any) => typeof x === 'string') : [],
+      cons: Array.isArray(result.cons) ? result.cons.filter((x: any) => typeof x === 'string') : [],
+      hidden_clauses: Array.isArray(result.hidden_clauses)
+        ? result.hidden_clauses.filter((x: any) => typeof x === 'string')
+        : [],
+      // Both field names so old and new page code works
+      specific_clauses: riskFlags,
+      risk_flags: riskFlags,
+      action_plan: Array.isArray(result.action_plan) ? result.action_plan : [],
+      callout_text: typeof result.callout_text === 'string' ? result.callout_text : '',
+      summary: typeof result.summary === 'string' ? result.summary : '',
+      extracted_figures: result.extracted_figures ?? {
+        loan_amount: null,
+        interest_rate: null,
+        tenure_months: null,
+        monthly_income: null,
+      },
+      paragraph_explanations: Array.isArray(result.paragraph_explanations)
+        ? result.paragraph_explanations
+        : [],
+      suggested_questions: Array.isArray(result.suggested_questions)
+        ? result.suggested_questions
+        : [],
+    };
+
+    return NextResponse.json(safe, {
       headers: { 'X-Response-Time': `${Date.now() - startTime}ms` },
     });
   } catch (err) {
     return NextResponse.json(
-      {
-        error: 'Internal server error',
-        details: err instanceof Error ? err.message : String(err),
-      },
+      { error: 'Server error', details: err instanceof Error ? err.message : String(err) },
       { status: 500, headers: { 'X-Response-Time': `${Date.now() - startTime}ms` } }
     );
   }

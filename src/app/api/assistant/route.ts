@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
       context = {},
       language = 'en',
       session_id,
+      paragraph_text,
     } = body ?? {};
 
     if (!message || typeof message !== 'string' || !message.trim()) {
@@ -46,6 +47,14 @@ export async function POST(req: NextRequest) {
       currentSimulation: context?.currentSimulation ?? null,
     });
 
+    // If user clicked "Ask AI About This" on a specific clause, focus entirely on it
+    const paragraphFocus =
+      typeof paragraph_text === 'string' && paragraph_text.trim()
+        ? `\n\nFOCUS: The user is asking specifically about this text from their document:\n"${paragraph_text.trim()}"\nAnswer ONLY about this specific text. Be direct, specific, and practical.`
+        : '';
+
+    const finalSystemPrompt = systemPrompt + paragraphFocus;
+
     // ── 2. Build message array (history + new message) ─────────────────────
     const historyMessages: ChatMessage[] = Array.isArray(chat_history)
       ? chat_history
@@ -55,7 +64,7 @@ export async function POST(req: NextRequest) {
       : [];
 
     const messages: ChatMessage[] = [
-      { role: 'system', content: systemPrompt },
+      { role: 'system', content: finalSystemPrompt },
       ...historyMessages,
       { role: 'user', content: message.trim() },
     ];

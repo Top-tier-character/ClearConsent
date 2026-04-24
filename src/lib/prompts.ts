@@ -38,7 +38,7 @@ export function buildAnalyzePrompt(text: string, language: Language, simplified:
 
   return `CRITICAL INSTRUCTION: You must respond ENTIRELY in ${langName}. Every single value in the JSON must be written in ${langName}. This is mandatory.
 
-You are a financial literacy expert helping low-income users in India understand financial documents. Analyze the document below and return a JSON object.
+You are an aggressive consumer advocate and financial literacy expert helping low-income users in India understand financial documents. Your goal is to expose predatory clauses, highlight real costs, and protect the consumer. Analyze the document below and return a JSON object.
 
 ${readingLevel}
 
@@ -70,16 +70,11 @@ Return ONLY this JSON structure with no other text:
     "tenure_months": 12,
     "monthly_income": null
   },
-  "quiz": [
+  "action_plan": [
     {
-      "question": "question about the document",
-      "options": ["option A", "option B", "option C", "option D"],
-      "correct_answer": "option A"
-    },
-    {
-      "question": "second question",
-      "options": ["option A", "option B", "option C", "option D"],
-      "correct_answer": "option B"
+      "riskTitle": "name of the high risk found",
+      "actionText": "what the user should do right now",
+      "emailTemplate": "Subject: Clarification on... \\n\\nDear Lender, I noticed clause X which states Y. Please clarify or remove this before I sign."
     }
   ]
 }
@@ -89,7 +84,7 @@ RULES:
 - If a number is not in the document set it to null
 - pros, cons, hidden_clauses must each have 3-5 items
 - specific_clauses must have 2-4 items with severity "high", "medium", or "low"
-- quiz must have exactly 2 questions each with exactly 4 options
+- action_plan must have 1-3 items corresponding to the highest risks found
 - Return ONLY the JSON object. No markdown. No backticks. No explanation.`;
 }
 
@@ -103,67 +98,6 @@ export function buildAnalyzeRetryPrompt(text: string, language: Language, simpli
   );
 }
 
-// (original buildAnalyzePrompt replaced above)
-function _unused_buildAnalyzePromptOld(
-  documentText: string,
-  language: Language,
-  simplified = false
-): string {
-  const lang = LANGUAGE_NAMES[language];
-
-  const truncated =
-    documentText.length > MAX_DOC_CHARS
-      ? documentText.slice(0, MAX_DOC_CHARS) + '\n[...document truncated — analyse the above excerpt]'
-      : documentText;
-
-  const simplicityInstruction = simplified
-    ? `IMPORTANT: Use class 5 reading level. Very short sentences. No financial jargon. Explain every term as if speaking to a child. Maximum 10 words per sentence.`
-    : '';
-
-  return `CRITICAL: Respond entirely in ${lang}. Every string value must be in ${lang}.
-
-You are a financial literacy expert helping low-income users in India understand financial agreements.
-${simplicityInstruction}
-
-Here is the financial document:
-
-${truncated}
-
-Analyze this document and return ONLY a JSON object with exactly these fields:
-
-- "document_type": string — auto-detect and name the document type (e.g. "Personal Loan Agreement", "Insurance Policy", "Mandate Form", "Account Opening Form", "Credit Card Agreement")
-- "pros": array of up to 5 short plain strings — benefits the user gets
-- "cons": array of up to 5 short plain strings — fees, penalties, or obligations
-- "hidden_clauses": array of up to 4 strings — non-obvious traps, auto-renewals, hidden penalties, prepayment charges
-- "specific_clauses": array of up to 5 objects each with:
-    - "quote": exact text from the document (max 100 characters)
-    - "explanation": plain language meaning of that clause in ${lang}
-    - "severity": one of "high" | "medium" | "low"
-- "callout_text": one string — read the actual document and extract real rupee figures. Use real numbers, e.g. "In total you will pay back ₹57,600 — that is ₹7,600 more than you borrowed". NEVER write ₹X or ₹Y or placeholder values. If no specific figures, write a plain sentence about the biggest financial obligation.
-- "risk_score": number 0–100 (0=safe, 100=very risky)
-- "risk_explanation": one plain sentence explaining the score in ${lang}
-- "summary": 2–3 plain sentences for someone who has never read a financial contract, in ${lang}
-- "quiz": exactly 2 objects each with "question" (string), "options" (array of exactly 4 strings), "correct_answer" (string matching one option exactly) — test comprehension of THIS document
-- "extracted_figures": object with loan_amount (number|null), interest_rate (number|null), tenure_months (number|null), monthly_income (number|null) — only values explicitly stated in the document, never guessed
-
-REMINDER: Every string in your JSON must be in ${lang}. This is mandatory.
-
-${JSON_ONLY_SUFFIX}`;
-}
-
-/**
- * Stricter retry prompt for /api/analyze when the first attempt fails JSON parsing.
- */
-export function buildAnalyzeRetryPrompt(
-  documentText: string,
-  language: Language,
-  simplified = false
-): string {
-  return (
-    buildAnalyzePrompt(documentText, language, simplified) +
-    '\n\nCRITICAL: Respond with ONE valid JSON object only. Start with { and end with }. No other text.'
-  );
-}
 
 // ---------------------------------------------------------------------------
 // /api/simulate

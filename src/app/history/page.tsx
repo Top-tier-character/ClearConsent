@@ -2,14 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RiskMeter } from '@/components/RiskMeter';
-import { Clock, Menu, X, ArrowRight, Lock, FileText, Search, Loader2, RefreshCw } from 'lucide-react';
-import Link from 'next/link';
+import { FileText, ArrowRight, Clock, AlertTriangle, ShieldCheck, RefreshCw } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
 interface ConsentRecord {
@@ -19,14 +17,13 @@ interface ConsentRecord {
   risk_score: number;
   risk_level: string;
   language_used: string;
-  quiz_score: number;
   document_name: string;
+  details?: any; // To hold local store details
 }
 
-// Loading skeleton for a history card
 function HistoryCardSkeleton() {
   return (
-    <div className="bg-surface dark:bg-card border border-border rounded-xl p-6 animate-pulse">
+    <div className="bg-white dark:bg-card border-2 border-border rounded-2xl p-6 animate-pulse">
       <div className="h-6 w-1/3 bg-border/60 rounded mb-3" />
       <div className="h-4 w-1/2 bg-border/40 rounded mb-2" />
       <div className="h-4 w-2/3 bg-border/40 rounded" />
@@ -36,49 +33,35 @@ function HistoryCardSkeleton() {
 
 function EmptyState() {
   return (
-    <div className="text-center py-20 text-muted-foreground bg-surface dark:bg-card rounded-2xl border-[2px] border-dashed border-border">
-      <Clock className="h-16 w-16 mx-auto mb-4 opacity-40" />
-      <p className="text-[22px] font-bold mb-2 text-primary dark:text-primary-foreground">No records yet</p>
-      <p className="text-[16px] mb-6">Analyze a document or simulate a loan to create your first record.</p>
-      <Link href="/analyze">
-        <Button className="h-[48px] px-8 text-[16px] font-bold bg-primary hover:bg-primary/90 text-white rounded-xl">
-          Analyze Your First Document <ArrowRight className="ml-2 h-5 w-5" />
-        </Button>
-      </Link>
+    <div className="text-center py-20 text-muted-foreground bg-white dark:bg-card rounded-3xl border-2 border-dashed border-border shadow-sm">
+      <Clock className="h-16 w-16 mx-auto mb-4 opacity-40 text-[#1B2A4A]" />
+      <p className="text-[22px] font-black mb-2 text-[#1B2A4A] dark:text-white">No documents yet</p>
+      <p className="text-[16px] mb-6 font-medium">Analyze a document to create your first record.</p>
+      <Button className="h-[48px] px-8 text-[16px] font-bold bg-[#1B2A4A] hover:bg-[#1B2A4A]/90 text-white rounded-xl" onClick={() => window.location.href = '/analyze'}>
+        Analyze Your First Document <ArrowRight className="ml-2 h-5 w-5" />
+      </Button>
     </div>
   );
 }
 
-function getStatusBadge(riskLevel?: string, riskScore?: number) {
-  const s = riskLevel ?? (typeof riskScore === 'number' ? (riskScore < 40 ? 'safe' : riskScore < 75 ? 'caution' : 'danger') : 'safe');
-  if (s === 'safe') return <Badge className="bg-success text-white">Approved</Badge>;
-  if (s === 'caution') return <Badge className="bg-warning text-white">Caution</Badge>;
-  return <Badge className="bg-danger text-white">Flagged</Badge>;
-}
-
-export default function HistoryPage() {
-  const { history, user } = useAppStore();
+export default function MyDocumentsPage() {
+  const router = useRouter();
+  const { history, user, setCurrentAnalysis } = useAppStore();
   const sessionId = user?.id ?? 'guest-session';
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [filterType, setFilterType] = useState('all');
-  const [filterDate, setFilterDate] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [filterLevel, setFilterLevel] = useState<'all' | 'high' | 'safe'>('all');
   const [apiRecords, setApiRecords] = useState<ConsentRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // ── Fetch real records from /api/history ─────────────────────────────────
   const fetchHistory = async () => {
     setIsLoading(true);
-    setFetchError(null);
     try {
       const res = await fetch(`/api/history?session_id=${encodeURIComponent(sessionId)}`);
-      if (!res.ok) throw new Error(`Server error ${res.status}`);
-      const data = await res.json();
-      setApiRecords(Array.isArray(data.records) ? data.records : []);
+      if (res.ok) {
+        const data = await res.json();
+        setApiRecords(Array.isArray(data.records) ? data.records : []);
+      }
     } catch (err) {
-      setFetchError(err instanceof Error ? err.message : 'Failed to load history.');
-      setApiRecords([]);
+      console.error(err);
     } finally {
       setIsLoading(false);
     }
@@ -86,211 +69,126 @@ export default function HistoryPage() {
 
   useEffect(() => { fetchHistory(); }, []);
 
-  // ── Build unified display list (API records + local store fallback) ───────
-  // If API returns real records, use those. Otherwise fall back to Zustand history.
-  const displayRecords = apiRecords.length > 0
-    ? apiRecords.map(r => ({
-        id: r.consent_id,
-        documentName: r.document_name || 'Financial Agreement',
-        type: r.consent_type,
-        date: r.timestamp,
-        riskScore: r.risk_score,
-        riskLevel: r.risk_level,
-        quizScore: r.quiz_score,
-        language: r.language_used,
-      }))
-    : history.map(h => ({
+  // Merge API records and local history, preferring local if ID matches (to get full details)
+  const displayRecords = [...apiRecords.map(r => ({
+    id: r.consent_id,
+    documentName: r.document_name || 'Financial Agreement',
+    type: r.consent_type,
+    date: r.timestamp,
+    riskScore: r.risk_score,
+    riskLevel: r.risk_level,
+    details: undefined
+  }))];
+
+  history.forEach(h => {
+    const existing = displayRecords.find(r => r.id === h.id);
+    if (existing) {
+      existing.details = h.details;
+      if (h.type === 'analysis' && h.details?.documentType) {
+        existing.documentName = h.details.documentType;
+      }
+    } else {
+      displayRecords.push({
         id: h.id,
-        documentName: h.type === 'analysis' ? 'Financial Agreement' : 'Loan Simulation',
+        documentName: h.details?.documentType || (h.type === 'analysis' ? 'Financial Agreement' : 'Loan Simulation'),
         type: h.type,
         date: h.date,
         riskScore: h.riskScore,
-        riskLevel: undefined as string | undefined,
-        quizScore: 100,
-        language: 'en',
-      }));
+        riskLevel: h.riskScore >= 75 ? 'danger' : h.riskScore >= 40 ? 'caution' : 'safe',
+        details: h.details
+      });
+    }
+  });
+
+  // Sort newest first
+  displayRecords.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const filtered = displayRecords.filter(r => {
-    if (filterType !== 'all' && r.type !== filterType) return false;
-    if (searchQuery && !r.id.toLowerCase().includes(searchQuery.toLowerCase()) &&
-        !r.documentName.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    
-    if (filterDate !== 'all') {
-      const recordDate = new Date(r.date);
-      const now = new Date();
-      const diffTime = Math.abs(now.getTime() - recordDate.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      if (filterDate === 'today' && diffDays > 1) return false;
-      if (filterDate === 'week' && diffDays > 7) return false;
-      if (filterDate === 'month' && diffDays > 30) return false;
-    }
-    
+    if (filterLevel === 'high') return r.riskScore >= 75;
+    if (filterLevel === 'safe') return r.riskScore < 40;
     return true;
   });
 
+  const handleViewAnalysis = (record: any) => {
+    if (record.details && record.type === 'analysis') {
+      setCurrentAnalysis(record.details);
+      router.push('/analyze');
+    } else {
+      // fallback
+      router.push(record.type === 'simulation' ? '/simulate' : '/analyze');
+    }
+  };
+
   return (
-    <div className="flex min-h-[calc(100vh-72px)] bg-background relative">
-      {/* Mobile overlay */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
-      )}
-
-      {/* Sidebar */}
-      <aside className={cn(
-        'fixed lg:static top-[72px] left-0 h-[calc(100vh-72px)] bg-surface dark:bg-card border-r border-border',
-        'w-[300px] shrink-0 z-50 flex flex-col transition-transform duration-300',
-        sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
-      )}>
-        <div className="p-6 border-b border-border flex justify-between items-center">
-          <h2 className="text-[22px] font-bold text-primary dark:text-primary-foreground">Your Documents</h2>
-          <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(false)}>
-            <X className="h-6 w-6" />
-          </Button>
+    <div className="min-h-[calc(100vh-72px)] bg-[#FAF9F6] dark:bg-background py-10 px-4">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <h1 className="text-4xl font-black text-[#1B2A4A] dark:text-white">My Documents</h1>
+          
+          <div className="flex items-center gap-2 bg-white dark:bg-card p-1 rounded-xl border border-border shadow-sm">
+            {(['all', 'high', 'safe'] as const).map(level => (
+              <button
+                key={level}
+                onClick={() => setFilterLevel(level)}
+                className={cn(
+                  "px-4 py-2 text-sm font-bold rounded-lg capitalize transition-colors",
+                  filterLevel === level ? "bg-[#1B2A4A] text-white" : "text-muted-foreground hover:bg-muted"
+                )}
+              >
+                {level === 'all' ? 'All Docs' : level === 'high' ? 'High Risk' : 'Safe'}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="grid gap-6">
           {isLoading ? (
-            [1, 2, 3].map(i => (
-              <div key={i} className="p-4 rounded-xl border border-border animate-pulse">
-                <div className="h-4 w-3/4 bg-border/60 rounded mb-2" />
-                <div className="h-3 w-1/2 bg-border/40 rounded" />
-              </div>
-            ))
-          ) : displayRecords.length === 0 ? (
-            <div className="p-4 text-center text-muted-foreground text-[14px]">No documents yet.</div>
+            [1, 2, 3].map(i => <HistoryCardSkeleton key={i} />)
+          ) : filtered.length === 0 ? (
+            <EmptyState />
           ) : (
-            displayRecords.map(r => (
-              <div key={r.id} className="p-4 rounded-xl border border-border hover:bg-muted/50 cursor-pointer transition-colors bg-background">
-                <div className="flex justify-between items-start mb-1">
-                  <span className="font-bold text-[15px] text-primary dark:text-primary-foreground truncate flex-1 pr-2">
-                    {r.documentName}
-                  </span>
-                  {getStatusBadge(r.riskLevel, r.riskScore)}
-                </div>
-                <p className="text-[12px] text-muted-foreground font-mono truncate">{r.id}</p>
-              </div>
-            ))
-          )}
-        </div>
+            filtered.map(r => {
+              const isHighRisk = r.riskScore >= 75;
+              const numFlags = r.details?.specificClauses?.length || 0;
+              const topRisk = r.details?.specificClauses?.[0]?.explanation || r.details?.actionPlan?.[0]?.riskTitle || 'Standard review completed.';
 
-        <div className="p-4 border-t border-border flex items-center justify-center gap-2 text-muted-foreground font-semibold text-[13px] bg-muted/20">
-          <Lock className="h-4 w-4 text-success" />
-          <span>Your data is private and secure</span>
-        </div>
-      </aside>
-
-      {/* Main */}
-      <main className="flex-1 overflow-y-auto p-6 lg:p-10 w-full">
-        <div className="max-w-5xl mx-auto">
-          <div className="flex items-center gap-4 mb-8">
-            <Button variant="outline" size="icon" className="lg:hidden h-12 w-12" onClick={() => setSidebarOpen(true)}>
-              <Menu className="h-6 w-6" />
-            </Button>
-            <h1 className="text-[32px] font-bold text-primary dark:text-primary-foreground flex-1">History</h1>
-            <Button variant="ghost" size="icon" onClick={fetchHistory} title="Refresh">
-              <RefreshCw className="h-5 w-5 text-muted-foreground" />
-            </Button>
-          </div>
-
-          {/* Error banner */}
-          {fetchError && (
-            <div className="mb-6 bg-danger/10 border-l-4 border-danger p-4 rounded-r text-danger font-semibold text-[15px] flex items-center justify-between">
-              <span>{fetchError}</span>
-              <Button variant="link" onClick={fetchHistory} className="text-danger p-0 h-auto ml-4 font-bold">
-                <RefreshCw className="h-4 w-4 mr-1" /> Retry
-              </Button>
-            </div>
-          )}
-
-          {/* Filter bar */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-8">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input
-                placeholder="Search by ID or name…"
-                className="pl-10 h-[52px] text-[15px] bg-surface dark:bg-card border-border"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <Select value={filterType} onValueChange={(v: any) => setFilterType(v)}>
-              <SelectTrigger className="w-full sm:w-[200px] h-[52px] text-[15px] bg-surface dark:bg-card border-border">
-                <SelectValue placeholder="Filter by Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="loan">Loan</SelectItem>
-                <SelectItem value="analysis">Analysis</SelectItem>
-                <SelectItem value="simulation">Simulation</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={filterDate} onValueChange={(v: any) => setFilterDate(v)}>
-              <SelectTrigger className="w-full sm:w-[200px] h-[52px] text-[15px] bg-surface dark:bg-card border-border">
-                <SelectValue placeholder="Filter by Date" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Time</SelectItem>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="week">Past Week</SelectItem>
-                <SelectItem value="month">Past Month</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Cards */}
-          <div className="grid gap-6">
-            {isLoading ? (
-              [1, 2, 3].map(i => <HistoryCardSkeleton key={i} />)
-            ) : filtered.length === 0 ? (
-              displayRecords.length === 0 ? <EmptyState /> : (
-                <div className="text-center py-20 text-muted-foreground bg-surface dark:bg-card rounded-2xl border-[2px] border-dashed border-border">
-                  <Clock className="h-16 w-16 mx-auto mb-4 opacity-40" />
-                  <p className="text-[20px] font-bold">No records match your filters.</p>
-                </div>
-              )
-            ) : (
-              filtered.map(r => (
-                <Card key={r.id} className="bg-surface dark:bg-card border rounded-xl overflow-hidden flex flex-col md:flex-row">
-                  <div className="flex-1 p-6 md:border-r border-border">
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="bg-primary/10 p-3 rounded-lg">
-                          <FileText className="h-6 w-6 text-primary" />
+              return (
+                <Card key={r.id} className="bg-white dark:bg-card border-2 border-border shadow-sm rounded-3xl overflow-hidden flex flex-col md:flex-row transition-all hover:border-[#1B2A4A]/30">
+                  <div className="flex-1 p-6 md:p-8">
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <div className="flex items-center gap-3 mb-2">
+                          <Badge variant="outline" className="font-bold border-[#1B2A4A] text-[#1B2A4A] dark:border-white dark:text-white">
+                            {r.type === 'simulation' ? 'Simulation' : r.documentName}
+                          </Badge>
+                          <span className="text-sm font-semibold text-muted-foreground">{new Date(r.date).toLocaleDateString()}</span>
                         </div>
-                        <div>
-                          <h3 className="text-[20px] font-bold text-primary dark:text-primary-foreground leading-tight">
-                            {r.documentName}
-                          </h3>
-                          <p className="text-[13px] text-muted-foreground font-mono mt-0.5">{r.id}</p>
-                        </div>
+                        <h3 className="text-2xl font-black text-foreground">ClearConsent Score: <span className={isHighRisk ? 'text-red-500' : r.riskScore >= 40 ? 'text-orange-500' : 'text-green-500'}>{r.riskScore}</span></h3>
                       </div>
-                      <div className="hidden sm:block">{getStatusBadge(r.riskLevel, r.riskScore)}</div>
                     </div>
-                    <div className="flex flex-wrap gap-x-6 gap-y-1 text-[14px] text-muted-foreground mt-2">
-                      <p><strong>Date:</strong> {new Date(r.date).toLocaleDateString()}</p>
-                      <p className="capitalize"><strong>Type:</strong> {r.type}</p>
-                      {r.quizScore !== undefined && <p><strong>Quiz:</strong> {r.quizScore}%</p>}
-                      {r.language && <p><strong>Language:</strong> {r.language.toUpperCase()}</p>}
+
+                    <div className="flex items-center gap-4 text-sm font-semibold mb-4 bg-muted/30 p-3 rounded-xl border border-border/50">
+                      <div className="flex items-center gap-1.5">
+                        {isHighRisk ? <AlertTriangle className="h-4 w-4 text-red-500" /> : <ShieldCheck className="h-4 w-4 text-green-500" />}
+                        <span>{numFlags} Red Flags Found</span>
+                      </div>
+                      <div className="w-1 h-1 rounded-full bg-border" />
+                      <p className="truncate flex-1 text-muted-foreground">{topRisk}</p>
                     </div>
+
+                    <Button onClick={() => handleViewAnalysis(r)} className="w-full sm:w-auto h-12 px-6 font-bold bg-[#1B2A4A] hover:bg-[#1B2A4A]/90 text-white rounded-xl">
+                      View Analysis <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
                   </div>
-                  <div className="md:w-[300px] p-6 bg-muted/10 flex flex-col justify-center border-t md:border-t-0 border-border">
-                    <div className="mb-5">
-                      <RiskMeter score={r.riskScore} />
-                    </div>
-                    <Link href={r.type === 'analysis' || r.type === 'analysis' ? '/analyze' : '/simulate'}>
-                      <Button className="w-full h-[44px] text-[15px] font-bold bg-primary hover:bg-primary/90 text-white rounded-xl">
-                        View Again <ArrowRight className="ml-2 h-4 w-4" />
-                      </Button>
-                    </Link>
+                  <div className="md:w-[250px] p-6 bg-[#FAF9F6] dark:bg-black flex flex-col justify-center items-center border-t md:border-t-0 md:border-l border-border">
+                     <RiskMeter score={r.riskScore} />
                   </div>
                 </Card>
-              ))
-            )}
-          </div>
+              );
+            })
+          )}
         </div>
-      </main>
+      </div>
     </div>
   );
 }

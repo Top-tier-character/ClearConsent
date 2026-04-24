@@ -12,9 +12,10 @@ export type CurrentAnalysis = {
   riskScore: number;
   risk_explanation: string;
   summary: string;
-  quiz: any[];
+  actionPlan: { riskTitle: string; actionText: string; emailTemplate: string }[];
   documentType?: string;
   specificClauses?: { text: string; severity: 'high' | 'medium' | 'low' }[];
+  rawTextParagraphs?: string[];
 };
 
 export type HistoryItem = {
