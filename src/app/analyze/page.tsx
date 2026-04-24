@@ -5,7 +5,7 @@ import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { Slider } from '@/components/ui/slider';
+
 import {
   FileText, CheckCircle, AlertTriangle, UploadCloud,
   Loader2, Camera, FileWarning, ShieldAlert, CheckCircle2, Copy, FileQuestion, HelpCircle, ChevronRight, X
@@ -53,6 +53,8 @@ export default function AnalyzePage() {
   const [selectedDocType, setSelectedDocType] = useState<string | null>(null);
   const [uploadMode, setUploadMode] = useState<'file' | 'paste' | 'camera'>('file');
   const [selectedParagraphIndex, setSelectedParagraphIndex] = useState<number | null>(null);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
 
   const [incomeOverride, setIncomeOverride] = useState<number>(0);
   const [incomeDrop, setIncomeDrop] = useState(false);
@@ -70,7 +72,7 @@ export default function AnalyzePage() {
     try {
       if (file.type.startsWith('image/')) {
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('image', file);
         const res = await fetch('/api/ocr', { method: 'POST', body: formData });
         const data = await res.json();
         setText(data.text);
@@ -78,11 +80,21 @@ export default function AnalyzePage() {
         const content = await file.text();
         setText(content);
       } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+        setFileName(file.name);
+        // Inline preview — no API call needed
+        if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
+        const blob = new Blob([await file.arrayBuffer()], { type: 'application/pdf' });
+        setPdfPreviewUrl(URL.createObjectURL(blob));
+        // Extract text
         const formData = new FormData();
         formData.append('file', file);
         const res = await fetch('/api/extract-pdf', { method: 'POST', body: formData });
         const data = await res.json();
-        setText(data.text);
+        if (data.text) {
+          setText(data.text);
+        } else {
+          setError(data.error || 'Could not extract text. Try Paste Text instead.');
+        }
       }
     } catch {
       setError('Failed to read file');
@@ -104,7 +116,10 @@ export default function AnalyzePage() {
         body: JSON.stringify({ text, language, simplified: simplifiedMode }),
       });
 
-      if (!response.ok) throw new Error('Analysis failed');
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || errData.details || `Analysis failed (${response.status})`);
+      }
       const data = await response.json();
 
       const paras = text.split('\n\n').map(p => p.trim()).filter(p => p.length > 0);
@@ -199,6 +214,17 @@ export default function AnalyzePage() {
                   <UploadCloud className="mr-3 h-6 w-6" /> Select File from Device
                 </Button>
                 {text && <p className="mt-3 text-success font-bold flex items-center"><CheckCircle2 className="mr-2 h-5 w-5"/> File loaded and ready!</p>}
+                {pdfPreviewUrl && (
+                  <div className="w-full mt-4 rounded-xl border border-border overflow-hidden shadow-sm">
+                    <div className="flex items-center justify-between px-4 py-2 bg-muted/30 border-b border-border">
+                      <span className="text-sm font-semibold text-muted-foreground">📄 {fileName}</span>
+                      <button onClick={() => { URL.revokeObjectURL(pdfPreviewUrl); setPdfPreviewUrl(null); }} className="text-muted-foreground hover:text-red-500 p-1">
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <iframe src={pdfPreviewUrl} className="w-full" style={{ height: '400px', border: 'none' }} title="PDF Preview" />
+                  </div>
+                )}
               </div>
             )}
             {uploadMode === 'paste' && (

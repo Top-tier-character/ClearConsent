@@ -14,7 +14,8 @@ export type CurrentAnalysis = {
   summary: string;
   actionPlan: { riskTitle: string; actionText: string; emailTemplate: string }[];
   documentType?: string;
-  specificClauses?: { text: string; severity: 'high' | 'medium' | 'low' }[];
+  specificClauses?: { quote?: string; text?: string; explanation?: string; severity: 'high' | 'medium' | 'low' }[];
+  extractedFigures?: { loan_amount: number | null; interest_rate: number | null; tenure_months: number | null; monthly_income: number | null } | null;
   rawTextParagraphs?: string[];
 };
 
