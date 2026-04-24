@@ -3,10 +3,17 @@
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useAppStore } from '@/lib/store';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileText, Plus, Clock, AlertTriangle, ShieldCheck, TrendingUp, BarChart3, Activity } from 'lucide-react';
 import Link from 'next/link';
+
+// Derive a risk label from a 0-100 numeric score (no direct risk_level on HistoryItem)
+function getRiskLevel(score: number): 'low' | 'medium' | 'high' {
+  if (score >= 75) return 'high';
+  if (score >= 40) return 'medium';
+  return 'low';
+}
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
@@ -20,14 +27,36 @@ export default function DashboardPage() {
     else setGreeting('Good Evening');
   }, []);
 
+  // Show spinner while NextAuth resolves
   if (status === 'loading') {
     return <div className="p-8 flex justify-center"><Activity className="animate-spin text-primary h-8 w-8" /></div>;
   }
 
-  // Calculate mock stats based on history (if any)
-  const docsAnalyzed = history.length;
-  const risksFound = history.reduce((acc, item) => acc + (item.analysis.risk_level === 'high' ? 3 : item.analysis.risk_level === 'medium' ? 1 : 0), 0);
-  const safeDocs = history.filter(item => item.analysis.risk_level === 'low').length;
+  // Guard: history hasn't hydrated from localStorage yet (e.g. right after Google OAuth redirect)
+  if (!Array.isArray(history)) {
+    return (
+      <div className="container mx-auto px-6 py-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <p className="text-muted-foreground text-[18px]">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Safe list: exclude any null/undefined entries that could slip in during hydration
+  const safeHistory = history.filter((item) => item != null && typeof item.riskScore === 'number');
+
+  // Compute summary stats using the derived risk level
+  const docsAnalyzed = safeHistory.length;
+  const risksFound = safeHistory.reduce((acc, item) => {
+    const level = getRiskLevel(item.riskScore);
+    return acc + (level === 'high' ? 3 : level === 'medium' ? 1 : 0);
+  }, 0);
+  const safeDocs = safeHistory.filter((item) => getRiskLevel(item.riskScore) === 'low').length;
+  const avgScore =
+    docsAnalyzed > 0
+      ? Math.round(safeHistory.reduce((acc, item) => acc + item.riskScore, 0) / docsAnalyzed)
+      : null;
 
   return (
     <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12 max-w-6xl">
@@ -104,7 +133,7 @@ export default function DashboardPage() {
               <div>
                 <p className="text-muted-foreground text-[14px] font-bold uppercase tracking-wider mb-1">Avg Score</p>
                 <h3 className="text-[32px] font-bold text-warning">
-                  {docsAnalyzed > 0 ? '72/100' : 'N/A'}
+                  {avgScore !== null ? `${avgScore}/100` : 'N/A'}
                 </h3>
               </div>
               <div className="bg-warning/10 p-3 rounded-full">
@@ -116,14 +145,14 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
+
         {/* Recent Activity */}
         <div className="lg:col-span-2 space-y-4">
           <h2 className="text-[20px] font-bold text-primary dark:text-primary-foreground flex items-center gap-2">
             <Clock className="h-5 w-5" /> Recent Activity
           </h2>
-          
-          {history.length === 0 ? (
+
+          {safeHistory.length === 0 ? (
             <Card className="bg-surface dark:bg-card border-border border-dashed border-[2px] shadow-none rounded-xl">
               <CardContent className="flex flex-col items-center justify-center py-16 px-4 text-center">
                 <div className="bg-muted p-4 rounded-full mb-4">
@@ -138,39 +167,50 @@ export default function DashboardPage() {
             </Card>
           ) : (
             <div className="space-y-4">
-              {history.slice(0, 5).map((item) => (
-                <Card key={item.id} className="bg-surface dark:bg-card border-border border-[2px] shadow-sm rounded-xl hover:shadow-md transition-shadow">
-                  <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className={`p-3 rounded-full ${
-                        item.analysis.risk_level === 'high' ? 'bg-danger/10 text-danger' : 
-                        item.analysis.risk_level === 'medium' ? 'bg-warning/10 text-warning' : 
-                        'bg-success/10 text-success'
-                      }`}>
-                        {item.analysis.risk_level === 'high' ? <AlertTriangle className="h-5 w-5" /> : 
-                         item.analysis.risk_level === 'medium' ? <AlertTriangle className="h-5 w-5" /> : 
-                         <ShieldCheck className="h-5 w-5" />}
+              {safeHistory.slice(0, 5).map((item) => {
+                const level = getRiskLevel(item.riskScore);
+                // item.details holds the CurrentAnalysis or simulation result object
+                const docName: string =
+                  (item.details as any)?.documentType ??
+                  (item.details as any)?.document_type ??
+                  (item.type === 'simulation' ? 'Loan Simulation' : 'Financial Document');
+                const summary: string = (item.details as any)?.summary ?? '';
+
+                return (
+                  <Card key={item.id} className="bg-surface dark:bg-card border-border border-[2px] shadow-sm rounded-xl hover:shadow-md transition-shadow">
+                    <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className={`p-3 rounded-full ${
+                          level === 'high' ? 'bg-danger/10 text-danger' :
+                          level === 'medium' ? 'bg-warning/10 text-warning' :
+                          'bg-success/10 text-success'
+                        }`}>
+                          {level === 'high' || level === 'medium'
+                            ? <AlertTriangle className="h-5 w-5" />
+                            : <ShieldCheck className="h-5 w-5" />}
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-[16px] text-primary dark:text-primary-foreground line-clamp-1">
+                            {docName}
+                          </h4>
+                          <p className="text-[13px] text-muted-foreground">
+                            {new Date(item.date).toLocaleDateString()}
+                            {summary ? ` • ${summary.substring(0, 60)}…` : ''}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="font-bold text-[16px] text-primary dark:text-primary-foreground line-clamp-1">
-                          {item.document_name}
-                        </h4>
-                        <p className="text-[13px] text-muted-foreground">
-                          {new Date(item.created_at).toLocaleDateString()} • {item.analysis.summary.substring(0, 60)}...
-                        </p>
-                      </div>
-                    </div>
-                    <Link href={`/analyze?id=${item.id}`} className="w-full sm:w-auto">
-                      <Button variant="outline" size="sm" className="w-full sm:w-auto border-border">View Report</Button>
-                    </Link>
-                  </CardContent>
-                </Card>
-              ))}
-              
-              {history.length > 5 && (
+                      <Link href={item.type === 'analysis' ? `/analyze?id=${item.id}` : `/simulate`} className="w-full sm:w-auto">
+                        <Button variant="outline" size="sm" className="w-full sm:w-auto border-border">View Report</Button>
+                      </Link>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+
+              {safeHistory.length > 5 && (
                 <div className="text-center pt-2">
                   <Link href="/history" className="text-primary font-bold text-[15px] hover:underline">
-                    View all {history.length} records →
+                    View all {safeHistory.length} records →
                   </Link>
                 </div>
               )}
@@ -183,42 +223,55 @@ export default function DashboardPage() {
           <h2 className="text-[20px] font-bold text-primary dark:text-primary-foreground flex items-center gap-2">
             <BarChart3 className="h-5 w-5" /> Risk Overview
           </h2>
-          
+
           <Card className="bg-surface dark:bg-card border-border border-[2px] shadow-sm rounded-xl">
             <CardContent className="p-6">
-              {history.length === 0 ? (
+              {safeHistory.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">Not enough data</div>
               ) : (
                 <div className="space-y-6">
+                  {/* Low */}
                   <div>
                     <div className="flex justify-between text-[14px] font-bold mb-2">
                       <span className="text-success">Low Risk ({safeDocs})</span>
-                      <span className="text-muted-foreground">{Math.round((safeDocs/docsAnalyzed)*100)}%</span>
+                      <span className="text-muted-foreground">{Math.round((safeDocs / docsAnalyzed) * 100)}%</span>
                     </div>
                     <div className="w-full bg-muted rounded-full h-3">
-                      <div className="bg-success h-3 rounded-full" style={{ width: `${(safeDocs/docsAnalyzed)*100}%` }}></div>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <div className="flex justify-between text-[14px] font-bold mb-2">
-                      <span className="text-warning">Medium Risk ({history.filter(i => i.analysis.risk_level === 'medium').length})</span>
-                      <span className="text-muted-foreground">{Math.round((history.filter(i => i.analysis.risk_level === 'medium').length/docsAnalyzed)*100)}%</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-3">
-                      <div className="bg-warning h-3 rounded-full" style={{ width: `${(history.filter(i => i.analysis.risk_level === 'medium').length/docsAnalyzed)*100}%` }}></div>
+                      <div className="bg-success h-3 rounded-full" style={{ width: `${(safeDocs / docsAnalyzed) * 100}%` }} />
                     </div>
                   </div>
 
-                  <div>
-                    <div className="flex justify-between text-[14px] font-bold mb-2">
-                      <span className="text-danger">High Risk ({history.filter(i => i.analysis.risk_level === 'high').length})</span>
-                      <span className="text-muted-foreground">{Math.round((history.filter(i => i.analysis.risk_level === 'high').length/docsAnalyzed)*100)}%</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-3">
-                      <div className="bg-danger h-3 rounded-full" style={{ width: `${(history.filter(i => i.analysis.risk_level === 'high').length/docsAnalyzed)*100}%` }}></div>
-                    </div>
-                  </div>
+                  {/* Medium */}
+                  {(() => {
+                    const count = safeHistory.filter((i) => getRiskLevel(i.riskScore) === 'medium').length;
+                    return (
+                      <div>
+                        <div className="flex justify-between text-[14px] font-bold mb-2">
+                          <span className="text-warning">Medium Risk ({count})</span>
+                          <span className="text-muted-foreground">{Math.round((count / docsAnalyzed) * 100)}%</span>
+                        </div>
+                        <div className="w-full bg-muted rounded-full h-3">
+                          <div className="bg-warning h-3 rounded-full" style={{ width: `${(count / docsAnalyzed) * 100}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* High */}
+                  {(() => {
+                    const count = safeHistory.filter((i) => getRiskLevel(i.riskScore) === 'high').length;
+                    return (
+                      <div>
+                        <div className="flex justify-between text-[14px] font-bold mb-2">
+                          <span className="text-danger">High Risk ({count})</span>
+                          <span className="text-muted-foreground">{Math.round((count / docsAnalyzed) * 100)}%</span>
+                        </div>
+                        <div className="w-full bg-muted rounded-full h-3">
+                          <div className="bg-danger h-3 rounded-full" style={{ width: `${(count / docsAnalyzed) * 100}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </CardContent>

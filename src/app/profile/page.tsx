@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { User, ShieldCheck, Settings, Bell, Lock, LogOut, AlertTriangle, Loader2 } from 'lucide-react';
+import { User, ShieldCheck, Settings, Bell, Lock, LogOut, AlertTriangle, Loader2, BarChart3 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
 export default function ProfilePage() {

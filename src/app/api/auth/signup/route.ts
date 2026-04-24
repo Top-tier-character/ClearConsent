@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
 
     // ── Hash password & create user ──────────────────────────────────────────
     const password_hash = await bcrypt.hash(password, 12);
-    await convexClient.mutation(api.mutations.createUser, {
+    await convexClient.mutation(api.mutations.createUser as any, {
       email,
       name,
       password_hash,

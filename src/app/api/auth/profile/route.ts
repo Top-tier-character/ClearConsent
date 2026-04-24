@@ -38,7 +38,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     // Update in Convex
-    await convexClient.mutation(api.mutations.updateUser, {
+    await convexClient.mutation(api.mutations.updateUser as any, {
       email: current_email,
       new_name: name ?? undefined,
       new_email: email ?? undefined,

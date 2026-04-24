@@ -46,7 +46,7 @@ export async function PATCH(req: NextRequest) {
 
     // Hash and save new password
     const new_password_hash = await bcrypt.hash(new_password, 12);
-    await convexClient.mutation(api.mutations.updateUser, {
+    await convexClient.mutation(api.mutations.updateUser as any, {
       email,
       new_password_hash,
     });
