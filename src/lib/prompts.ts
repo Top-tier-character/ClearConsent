@@ -30,7 +30,81 @@ const LANGUAGE_NAMES: Record<Language, string> = {
  * Supports `simplified` mode for class-5 reading level output.
  * Returns document_type, specific_clauses, and all standard fields.
  */
-export function buildAnalyzePrompt(
+export function buildAnalyzePrompt(text: string, language: Language, simplified: boolean = false): string {
+  const langName = language === 'hi' ? 'Hindi' : language === 'mr' ? 'Marathi' : 'English';
+  const readingLevel = simplified
+    ? 'Use extremely simple language. Short sentences. No jargon. Like explaining to a 10-year-old.'
+    : 'Use clear simple language. Explain any financial term you use.';
+
+  return `CRITICAL INSTRUCTION: You must respond ENTIRELY in ${langName}. Every single value in the JSON must be written in ${langName}. This is mandatory.
+
+You are a financial literacy expert helping low-income users in India understand financial documents. Analyze the document below and return a JSON object.
+
+${readingLevel}
+
+DOCUMENT TO ANALYZE:
+"""
+${text.slice(0, 6000)}
+"""
+
+Return ONLY this JSON structure with no other text:
+{
+  "document_type": "one of: Loan Agreement, Insurance Policy, Auto-Pay Mandate, Account Opening, Rental Agreement, Credit Card Terms, Other",
+  "pros": ["benefit 1", "benefit 2", "benefit 3"],
+  "cons": ["obligation 1", "obligation 2", "obligation 3"],
+  "hidden_clauses": ["risk 1", "risk 2", "risk 3"],
+  "specific_clauses": [
+    {
+      "quote": "exact short quote from document max 80 chars",
+      "explanation": "what this means in plain language",
+      "severity": "high"
+    }
+  ],
+  "callout_text": "Extract REAL numbers from document. Example: In total you will pay back Rs 57600 - that is Rs 7600 more than you borrowed. NEVER write Rs X or Rs Y.",
+  "risk_score": 65,
+  "risk_explanation": "one sentence why this score",
+  "summary": "2-3 sentences plain language summary",
+  "extracted_figures": {
+    "loan_amount": 50000,
+    "interest_rate": 18,
+    "tenure_months": 12,
+    "monthly_income": null
+  },
+  "quiz": [
+    {
+      "question": "question about the document",
+      "options": ["option A", "option B", "option C", "option D"],
+      "correct_answer": "option A"
+    },
+    {
+      "question": "second question",
+      "options": ["option A", "option B", "option C", "option D"],
+      "correct_answer": "option B"
+    }
+  ]
+}
+
+RULES:
+- Use ONLY real numbers found in the document for callout_text and extracted_figures
+- If a number is not in the document set it to null
+- pros, cons, hidden_clauses must each have 3-5 items
+- specific_clauses must have 2-4 items with severity "high", "medium", or "low"
+- quiz must have exactly 2 questions each with exactly 4 options
+- Return ONLY the JSON object. No markdown. No backticks. No explanation.`;
+}
+
+/**
+ * Stricter retry prompt for /api/analyze when the first attempt fails JSON parsing.
+ */
+export function buildAnalyzeRetryPrompt(text: string, language: Language, simplified = false): string {
+  return (
+    buildAnalyzePrompt(text, language, simplified) +
+    '\n\nCRITICAL: Respond with ONE valid JSON object only. Start with { and end with }. No other text.'
+  );
+}
+
+// (original buildAnalyzePrompt replaced above)
+function _unused_buildAnalyzePromptOld(
   documentText: string,
   language: Language,
   simplified = false

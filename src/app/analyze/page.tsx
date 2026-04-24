@@ -83,6 +83,7 @@ export default function AnalyzePage() {
   const [isUploading2, setIsUploading2] = useState(false);
   const extractedTextRef2 = useRef<string>('');
   const fileInputRef2 = useRef<HTMLInputElement>(null);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
 
   const runAnalysis = async (docNum: 1 | 2, docText: string) => {
     if (!docText.trim()) {
@@ -105,19 +106,17 @@ export default function AnalyzePage() {
 
       const result: CurrentAnalysis = {
         id: `CLR-${Date.now()}`,
-        pros: data.pros ?? [],
-        cons: data.cons ?? [],
-        hiddenClauses: data.hidden_clauses ?? [],
-        repaymentInfo: data.callout_text ?? '',
-        riskScore: data.risk_score ?? 0,
-        risk_explanation: data.risk_explanation ?? '',
-        summary: data.summary ?? '',
-        quiz: data.quiz ?? [],
-        documentType: data.documentType ?? 'Financial Document',
-        specificClauses: data.specificClauses ?? [
-          { text: 'Late payment penalty of 5% applied after 3 days.', severity: 'medium' },
-          { text: 'Lender reserves the right to call back the loan at any time.', severity: 'high' }
-        ]
+        documentType: data.document_type ?? 'Financial Document',
+        pros: Array.isArray(data.pros) ? data.pros : [],
+        cons: Array.isArray(data.cons) ? data.cons : [],
+        hiddenClauses: Array.isArray(data.hidden_clauses) ? data.hidden_clauses : [],
+        specificClauses: Array.isArray(data.specific_clauses) ? data.specific_clauses : [],
+        repaymentInfo: typeof data.callout_text === 'string' ? data.callout_text : '',
+        riskScore: typeof data.risk_score === 'number' ? data.risk_score : 0,
+        risk_explanation: typeof data.risk_explanation === 'string' ? data.risk_explanation : '',
+        summary: typeof data.summary === 'string' ? data.summary : '',
+        quiz: Array.isArray(data.quiz) ? data.quiz : [],
+        extractedFigures: data.extracted_figures ?? null,
       };
 
       if (docNum === 1) {
@@ -153,6 +152,11 @@ export default function AnalyzePage() {
         const content = await file.text();
         docNum === 1 ? setText1(content) : setText2(content);
       } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+        if (docNum === 1) {
+          if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
+          const blob = new Blob([await file.arrayBuffer()], { type: 'application/pdf' });
+          setPdfPreviewUrl(URL.createObjectURL(blob));
+        }
         const formData = new FormData();
         formData.append('file', file);
         const res = await fetch('/api/extract-pdf', { method: 'POST', body: formData });
@@ -216,6 +220,21 @@ export default function AnalyzePage() {
             </Button>
           )}
 
+          {docNum === 1 && pdfPreviewUrl && (
+            <div className="w-full rounded-xl border border-border overflow-hidden bg-card mt-2">
+              <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30">
+                <p className="text-[14px] font-semibold text-muted-foreground">📄 {uploadFileName1}</p>
+                <button
+                  onClick={() => { URL.revokeObjectURL(pdfPreviewUrl); setPdfPreviewUrl(null); }}
+                  className="text-muted-foreground hover:text-red-500"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <iframe src={pdfPreviewUrl} className="w-full" style={{ height: '420px', border: 'none' }} title="PDF Preview" />
+            </div>
+          )}
+
           <Button
             onClick={() => runAnalysis(docNum, extractedTextRef.current || text)}
             disabled={(docNum === 1 ? isLoading1 : isLoading2) || isUploading}
@@ -260,9 +279,23 @@ export default function AnalyzePage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-4 space-y-3">
-              {analysis.specificClauses.map((clause, idx) => (
-                <div key={idx} className="flex gap-3 bg-muted/40 p-3 rounded-lg border-l-4" style={{ borderColor: clause.severity === 'high' ? '#EF4444' : '#F59E0B' }}>
-                  <span className="text-[14px] italic font-medium text-foreground leading-snug">"{clause.text}"</span>
+              {analysis.specificClauses.map((clause: any, idx: number) => (
+                <div key={idx} className={cn(
+                  'rounded-xl border p-4',
+                  clause.severity === 'high' ? 'border-red-400/40 bg-red-500/5' :
+                  clause.severity === 'medium' ? 'border-yellow-400/40 bg-yellow-500/5' :
+                  'border-green-400/40 bg-green-500/5'
+                )}>
+                  <span className={cn(
+                    'text-[11px] font-bold px-2 py-0.5 rounded-full uppercase inline-block mb-2',
+                    clause.severity === 'high' ? 'bg-red-500 text-white' :
+                    clause.severity === 'medium' ? 'bg-yellow-500 text-white' :
+                    'bg-green-500 text-white'
+                  )}>{clause.severity ?? 'low'} risk</span>
+                  <blockquote className="text-[13px] italic text-muted-foreground border-l-2 border-border pl-3 mb-2">
+                    "{clause.quote ?? clause.text ?? ''}"
+                  </blockquote>
+                  {clause.explanation && <p className="text-[14px] text-foreground font-medium">{clause.explanation}</p>}
                 </div>
               ))}
             </CardContent>

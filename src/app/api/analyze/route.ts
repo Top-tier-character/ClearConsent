@@ -66,15 +66,19 @@ export async function POST(req: NextRequest) {
     let result: AnalyzeResult;
 
     const attempt = async (retry: boolean): Promise<string> => {
-      const prompt = retry
-        ? buildAnalyzeRetryPrompt(text, language, simplified)
-        : buildAnalyzePrompt(text, language, simplified);
+      const systemPrompt = buildAnalyzePrompt(text, language, simplified);
+      const userPrompt = retry
+        ? `IMPORTANT: Return ONLY valid JSON. No markdown. No explanation.\n\nAnalyze this document:\n"""\n${text.slice(0, 6000)}\n"""`
+        : `Analyze this document and return the JSON:\n"""\n${text.slice(0, 6000)}\n"""`;
 
       const completion = await groq.chat.completions.create({
         model: GROQ_MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.3,
-        max_tokens: 1800,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.2,
+        max_tokens: 2048,
       });
 
       return completion.choices[0]?.message?.content ?? '';
