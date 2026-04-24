@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileSearch, Calculator, CheckCircle, ArrowRight, Lock, Upload, Brain, ShieldCheck } from 'lucide-react';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
-import { redirect } from 'next/navigation';
 
 export default async function LandingPage() {
   let session = null;
@@ -14,10 +13,6 @@ export default async function LandingPage() {
     // NextAuth misconfiguration (missing secret, bad Google creds, etc.) must not
     // crash the entire homepage — log it and continue as unauthenticated.
     console.error('[authOptions] getServerSession failed:', err);
-  }
-
-  if (session?.user) {
-    redirect('/dashboard');
   }
 
   return (
@@ -42,12 +37,21 @@ export default async function LandingPage() {
 
           {/* CTA buttons */}
           <div className="flex flex-col sm:flex-row justify-center gap-3 w-full max-w-lg sm:w-auto">
-            <Link href="/analyze" className="w-full sm:w-auto">
-              <Button className="w-full h-[48px] px-6 sm:px-10 text-[15px] sm:text-[17px] font-bold rounded-xl shadow-md transition-transform hover:-translate-y-1">
-                <FileSearch className="mr-2 h-5 w-5 shrink-0" />
-                Analyze a Financial Document
-              </Button>
-            </Link>
+            {session?.user ? (
+              <Link href="/dashboard" className="w-full sm:w-auto">
+                <Button className="w-full h-[48px] px-6 sm:px-10 text-[15px] sm:text-[17px] font-bold rounded-xl shadow-md transition-transform hover:-translate-y-1">
+                  <ArrowRight className="mr-2 h-5 w-5 shrink-0" />
+                  Go to Dashboard
+                </Button>
+              </Link>
+            ) : (
+              <Link href="/analyze" className="w-full sm:w-auto">
+                <Button className="w-full h-[48px] px-6 sm:px-10 text-[15px] sm:text-[17px] font-bold rounded-xl shadow-md transition-transform hover:-translate-y-1">
+                  <FileSearch className="mr-2 h-5 w-5 shrink-0" />
+                  Analyze a Financial Document
+                </Button>
+              </Link>
+            )}
             <Link href="/simulate" className="w-full sm:w-auto">
               <Button
                 variant="outline"

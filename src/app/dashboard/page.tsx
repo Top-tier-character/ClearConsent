@@ -60,6 +60,13 @@ export default function DashboardPage() {
 
   return (
     <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12 max-w-6xl">
+      <Link
+        href="/"
+        className="inline-flex items-center gap-1 text-[14px] text-muted-foreground hover:text-primary mb-6 font-semibold transition-colors"
+      >
+        ← Back to Home
+      </Link>
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
         <div>
           <h1 className="text-[28px] sm:text-[36px] font-bold text-primary dark:text-primary-foreground tracking-tight">
