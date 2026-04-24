@@ -61,6 +61,7 @@ export default function HistoryPage() {
   const sessionId = user?.id ?? 'guest-session';
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [filterType, setFilterType] = useState('all');
+  const [filterDate, setFilterDate] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [apiRecords, setApiRecords] = useState<ConsentRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -113,6 +114,18 @@ export default function HistoryPage() {
     if (filterType !== 'all' && r.type !== filterType) return false;
     if (searchQuery && !r.id.toLowerCase().includes(searchQuery.toLowerCase()) &&
         !r.documentName.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    
+    if (filterDate !== 'all') {
+      const recordDate = new Date(r.date);
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - recordDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (filterDate === 'today' && diffDays > 1) return false;
+      if (filterDate === 'week' && diffDays > 7) return false;
+      if (filterDate === 'month' && diffDays > 30) return false;
+    }
+    
     return true;
   });
 
@@ -210,6 +223,18 @@ export default function HistoryPage() {
                 <SelectItem value="loan">Loan</SelectItem>
                 <SelectItem value="analysis">Analysis</SelectItem>
                 <SelectItem value="simulation">Simulation</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={filterDate} onValueChange={(v: any) => setFilterDate(v)}>
+              <SelectTrigger className="w-full sm:w-[200px] h-[52px] text-[15px] bg-surface dark:bg-card border-border">
+                <SelectValue placeholder="Filter by Date" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Time</SelectItem>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="week">Past Week</SelectItem>
+                <SelectItem value="month">Past Month</SelectItem>
               </SelectContent>
             </Select>
           </div>

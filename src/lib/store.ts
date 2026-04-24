@@ -3,6 +3,20 @@ import { persist } from 'zustand/middleware';
 
 export type Language = 'en' | 'hi' | 'mr';
 
+export type CurrentAnalysis = {
+  id: string;
+  pros: string[];
+  cons: string[];
+  hiddenClauses: string[];
+  repaymentInfo: string;
+  riskScore: number;
+  risk_explanation: string;
+  summary: string;
+  quiz: any[];
+  documentType?: string;
+  specificClauses?: { text: string; severity: 'high' | 'medium' | 'low' }[];
+};
+
 export type HistoryItem = {
   id: string;
   type: 'analysis' | 'simulation';
@@ -17,6 +31,11 @@ export type SimulationPrefill = {
   interest_rate: number | null;
   tenure_months: number | null;
   monthly_income: number | null;
+};
+
+export type ChatMessage = {
+  role: 'user' | 'assistant';
+  content: string;
 };
 
 interface AppState {
@@ -38,6 +57,13 @@ interface AppState {
 
   user: any | null;
   setUser: (user: any | null) => void;
+
+  simplifiedMode: boolean;
+  setSimplifiedMode: (mode: boolean) => void;
+
+  chatHistory: ChatMessage[];
+  addChatMessage: (msg: ChatMessage) => void;
+  clearChatHistory: () => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -60,6 +86,13 @@ export const useAppStore = create<AppState>()(
 
       user: null,
       setUser: (u) => set({ user: u }),
+
+      simplifiedMode: false,
+      setSimplifiedMode: (mode) => set({ simplifiedMode: mode }),
+
+      chatHistory: [],
+      addChatMessage: (msg) => set((state) => ({ chatHistory: [...state.chatHistory, msg] })),
+      clearChatHistory: () => set({ chatHistory: [] }),
     }),
     {
       name: 'clearconsent-storage',
@@ -69,6 +102,8 @@ export const useAppStore = create<AppState>()(
         currentSimulation: state.currentSimulation,
         simulationPrefill: state.simulationPrefill,
         user: state.user,
+        simplifiedMode: state.simplifiedMode,
+        chatHistory: state.chatHistory,
         // language is intentionally excluded — always starts as 'en'
       }),
     }

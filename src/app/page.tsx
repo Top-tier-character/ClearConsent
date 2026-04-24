@@ -2,8 +2,17 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileSearch, Calculator, CheckCircle, ArrowRight, Lock, Upload, Brain, ShieldCheck } from 'lucide-react';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { redirect } from 'next/navigation';
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const session = await getServerSession(authOptions);
+  
+  if (session?.user) {
+    redirect('/dashboard');
+  }
+
   return (
     <div className="overflow-hidden">
       {/* ── Hero ───────────────────────────────────────────────────────────── */}

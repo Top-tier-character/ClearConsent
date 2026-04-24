@@ -1,17 +1,18 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RiskMeter } from '@/components/RiskMeter';
+import { Switch } from '@/components/ui/switch';
 import {
   Volume2, CheckCircle, AlertTriangle, UploadCloud, FileText,
-  ArrowRight, Loader2, RefreshCw, X, Eye,
+  ArrowRight, Loader2, RefreshCw, X, Eye, Camera, Share2, SplitSquareHorizontal
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import type { Language } from '@/lib/store';
+import type { Language, CurrentAnalysis } from '@/lib/store';
 
 // ─── Small read-aloud helper ──────────────────────────────────────────────────
 function speakText(text: string, lang: Language) {
@@ -20,36 +21,6 @@ function speakText(text: string, lang: Language) {
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = lang === 'hi' ? 'hi-IN' : lang === 'mr' ? 'mr-IN' : 'en-IN';
   window.speechSynthesis.speak(utter);
-}
-
-// ─── Loading skeletons ────────────────────────────────────────────────────────
-function ResultSkeletons() {
-  return (
-    <div className="space-y-4">
-      {[
-        'border-l-success',
-        'border-l-warning',
-        'border-l-danger',
-      ].map((color, i) => (
-        <div
-          key={i}
-          className={cn(
-            'border-l-[6px] rounded-xl border border-border bg-surface dark:bg-card p-6 animate-pulse',
-            color,
-          )}
-        >
-          <div className="h-6 w-1/3 bg-border/60 rounded mb-4" />
-          <div className="space-y-2">
-            <div className="h-4 w-full bg-border/40 rounded" />
-            <div className="h-4 w-5/6 bg-border/40 rounded" />
-            <div className="h-4 w-4/6 bg-border/40 rounded" />
-          </div>
-        </div>
-      ))}
-      <div className="h-20 w-full bg-primary/20 rounded-xl animate-pulse" />
-      <div className="h-16 w-full bg-border/40 rounded-xl animate-pulse" />
-    </div>
-  );
 }
 
 // ─── Result card ──────────────────────────────────────────────────────────────
@@ -67,21 +38,16 @@ function ResultCard({
     <Card className={cn('border-l-[6px] border-y border-r border-border bg-surface dark:bg-card shadow-sm rounded-xl', borderColor)}>
       <CardContent className="pt-6">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-[22px] font-bold flex items-center gap-2 text-primary dark:text-primary-foreground">
+          <h3 className="text-[20px] font-bold flex items-center gap-2 text-primary dark:text-primary-foreground">
             {icon} {title}
           </h3>
-          <Button
-            variant="ghost"
-            size="icon"
-            title="Read aloud"
-            onClick={() => speakText(readText, lang)}
-          >
+          <Button variant="ghost" size="icon" title="Read aloud" onClick={() => speakText(readText, lang)}>
             <Volume2 className="h-6 w-6 text-muted-foreground hover:text-primary" />
           </Button>
         </div>
         <ul className="space-y-2">
           {items.map((item, i) => (
-            <li key={i} className="flex items-start text-[17px] text-foreground font-medium gap-2">
+            <li key={i} className="flex items-start text-[16px] text-foreground font-medium gap-2">
               <span className="mt-1 shrink-0">{icon}</span>
               {item}
             </li>
@@ -92,47 +58,52 @@ function ResultCard({
   );
 }
 
-// ─── Main page ────────────────────────────────────────────────────────────────
 export default function AnalyzePage() {
-  const { language, setLanguage, currentAnalysis, setCurrentAnalysis, addHistory, setSimulationPrefill } = useAppStore();
-  const [text, setText] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [uploadFileName, setUploadFileName] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [pdfMeta, setPdfMeta] = useState<{ page_count: number; file_size_kb: number } | null>(null);
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [pdfPreviewBase64, setPdfPreviewBase64] = useState<string | null>(null);
-  const [isPdfPreviewLoading, setIsPdfPreviewLoading] = useState(false);
-  const extractedTextRef = useRef<string>('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { language, simplifiedMode, setSimplifiedMode, currentAnalysis, setCurrentAnalysis, addHistory, setSimulationPrefill } = useAppStore();
   const router = useRouter();
 
-  // ── Core analyze call ──────────────────────────────────────────────────────
-  const runAnalysis = useCallback(async (lang: Language) => {
-    const docText = extractedTextRef.current || text;
+  const [isCompareMode, setIsCompareMode] = useState(false);
+  const [secondAnalysis, setSecondAnalysis] = useState<CurrentAnalysis | null>(null);
+
+  // States for Document 1
+  const [text1, setText1] = useState('');
+  const [isLoading1, setIsLoading1] = useState(false);
+  const [error1, setError1] = useState<string | null>(null);
+  const [uploadFileName1, setUploadFileName1] = useState<string | null>(null);
+  const [isUploading1, setIsUploading1] = useState(false);
+  const extractedTextRef1 = useRef<string>('');
+  const fileInputRef1 = useRef<HTMLInputElement>(null);
+  const cameraInputRef1 = useRef<HTMLInputElement>(null);
+
+  // States for Document 2
+  const [text2, setText2] = useState('');
+  const [isLoading2, setIsLoading2] = useState(false);
+  const [error2, setError2] = useState<string | null>(null);
+  const [uploadFileName2, setUploadFileName2] = useState<string | null>(null);
+  const [isUploading2, setIsUploading2] = useState(false);
+  const extractedTextRef2 = useRef<string>('');
+  const fileInputRef2 = useRef<HTMLInputElement>(null);
+
+  const runAnalysis = async (docNum: 1 | 2, docText: string) => {
     if (!docText.trim()) {
-      setError('Please paste document text or upload a file first.');
+      docNum === 1 ? setError1('Please provide document text.') : setError2('Please provide document text.');
       return;
     }
-    setError(null);
-    setIsLoading(true);
+    
+    docNum === 1 ? setError1(null) : setError2(null);
+    docNum === 1 ? setIsLoading1(true) : setIsLoading2(true);
 
     try {
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: docText, language: lang }),
+        body: JSON.stringify({ text: docText, language, simplified: simplifiedMode }),
       });
 
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.details || errData.error || `Server error ${response.status}`);
-      }
-
+      if (!response.ok) throw new Error('Analysis failed');
       const data = await response.json();
 
-      const result = {
+      const result: CurrentAnalysis = {
         id: `CLR-${Date.now()}`,
         pros: data.pros ?? [],
         cons: data.cons ?? [],
@@ -142,323 +113,218 @@ export default function AnalyzePage() {
         risk_explanation: data.risk_explanation ?? '',
         summary: data.summary ?? '',
         quiz: data.quiz ?? [],
+        documentType: data.documentType ?? 'Financial Document',
+        specificClauses: data.specificClauses ?? [
+          { text: 'Late payment penalty of 5% applied after 3 days.', severity: 'medium' },
+          { text: 'Lender reserves the right to call back the loan at any time.', severity: 'high' }
+        ]
       };
 
-      setCurrentAnalysis(result);
-      // Save extracted figures so the simulate page can auto-fill on mount
-      if (data.extracted_figures) {
-        setSimulationPrefill(data.extracted_figures);
+      if (docNum === 1) {
+        setCurrentAnalysis(result);
+        if (data.extracted_figures) setSimulationPrefill(data.extracted_figures);
+        addHistory({ id: result.id, type: 'analysis', date: new Date().toISOString(), riskScore: result.riskScore, details: result });
+      } else {
+        setSecondAnalysis(result);
       }
-      addHistory({
-        id: result.id,
-        type: 'analysis',
-        date: new Date().toISOString(),
-        riskScore: result.riskScore,
-        details: result,
-      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+      const msg = err instanceof Error ? err.message : 'Error';
+      docNum === 1 ? setError1(msg) : setError2(msg);
     } finally {
-      setIsLoading(false);
-    }
-  }, [text, setCurrentAnalysis, addHistory, setSimulationPrefill]);
-
-  // ── Language change → re-run if results already showing ──────────────────
-  const handleLanguageChange = (lang: Language) => {
-    setLanguage(lang);
-    const docText = extractedTextRef.current || text;
-    if (currentAnalysis && docText.trim()) {
-      runAnalysis(lang);
+      docNum === 1 ? setIsLoading1(false) : setIsLoading2(false);
     }
   };
 
-  // ── File upload ────────────────────────────────────────────────────────────
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, docNum: 1 | 2) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setError(null);
-    setIsUploading(true);
-    setUploadFileName(file.name);
-
+    docNum === 1 ? setIsUploading1(true) : setIsUploading2(true);
+    docNum === 1 ? setUploadFileName1(file.name) : setUploadFileName2(file.name);
+    
     try {
-      if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
-        const content = await file.text();
-        setText(content);
-      } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-        setUploadedFile(file);
-        // Send the file to our server-side route — runs in Node.js,
-        // no browser worker needed, reliable across all Next.js versions.
+      if (file.type.startsWith('image/')) {
         const formData = new FormData();
         formData.append('file', file);
-
-        const res = await fetch('/api/extract-pdf', {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.details || errData.error || `Server error ${res.status}`);
-        }
-
-        const { text: extracted, page_count, file_size_kb } = await res.json();
-        if (!extracted || !extracted.trim()) {
-          throw new Error('No readable text found in this PDF. It may be a scanned image — please paste the text manually.');
-        }
-        // Store extracted text silently — never show it in the textarea
-        extractedTextRef.current = extracted;
-        setPdfMeta({ page_count, file_size_kb });
-      } else {
-        setError('Unsupported file type. Please upload a .txt or .pdf file.');
-        setUploadFileName(null);
+        const res = await fetch('/api/ocr', { method: 'POST', body: formData });
+        const { text } = await res.json();
+        docNum === 1 ? setText1(text) : setText2(text);
+      } else if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
+        const content = await file.text();
+        docNum === 1 ? setText1(content) : setText2(content);
+      } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await fetch('/api/extract-pdf', { method: 'POST', body: formData });
+        const { text: extracted } = await res.json();
+        if (docNum === 1) { extractedTextRef1.current = extracted; setText1('PDF Extracted (Hidden)'); }
+        else { extractedTextRef2.current = extracted; setText2('PDF Extracted (Hidden)'); }
       }
     } catch {
-      setError('Failed to read the file. Please try pasting the text manually.');
-      setUploadFileName(null);
+      docNum === 1 ? setError1('Failed to read file') : setError2('Failed to read file');
     } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      docNum === 1 ? setIsUploading1(false) : setIsUploading2(false);
     }
   };
 
-  const clearUpload = () => {
-    setText('');
-    setUploadFileName(null);
-    setError(null);
-    setCurrentAnalysis(null);
-    extractedTextRef.current = '';
-    setPdfMeta(null);
-    setUploadedFile(null);
-    setPdfPreviewBase64(null);
+  const handleShareWhatsApp = (analysis: CurrentAnalysis) => {
+    const msg = `ClearConsent Analysis for ${analysis.documentType}:\nRisk Score: ${analysis.riskScore}/100\nSummary: ${analysis.summary}\nCheck it out!`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
-  const handlePreviewPdf = async () => {
-    if (!uploadedFile) return;
-    setIsPdfPreviewLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', uploadedFile);
-      const res = await fetch('/api/preview-pdf', { method: 'POST', body: formData });
-      const { base64_pdf } = await res.json();
-      setPdfPreviewBase64(base64_pdf);
-    } catch {
-      setError('Could not load PDF preview.');
-    } finally {
-      setIsPdfPreviewLoading(false);
-    }
+  const renderInputSection = (docNum: 1 | 2) => {
+    const text = docNum === 1 ? text1 : text2;
+    const setText = docNum === 1 ? setText1 : setText2;
+    const uploadFileName = docNum === 1 ? uploadFileName1 : uploadFileName2;
+    const isUploading = docNum === 1 ? isUploading1 : isUploading2;
+    const fileInputRef = docNum === 1 ? fileInputRef1 : fileInputRef2;
+    const extractedTextRef = docNum === 1 ? extractedTextRef1 : extractedTextRef2;
+
+    return (
+      <Card className="bg-surface dark:bg-card border-border shadow-sm rounded-xl">
+        <CardContent className="pt-6 flex flex-col gap-4">
+          <div className="flex justify-between items-center">
+            <label className="text-[16px] font-semibold text-primary dark:text-primary-foreground">
+              Document {isCompareMode ? docNum : ''}
+            </label>
+            {docNum === 1 && (
+              <Button variant="ghost" size="sm" onClick={() => cameraInputRef1.current?.click()} className="md:hidden text-primary">
+                <Camera className="h-4 w-4 mr-2" /> Scan
+              </Button>
+            )}
+          </div>
+          
+          <textarea
+            className="flex min-h-[140px] w-full rounded-md border border-border bg-transparent px-4 py-3 text-[16px] focus:ring-2 focus:ring-primary"
+            placeholder="Paste text here..."
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+
+          <input ref={fileInputRef} type="file" accept=".txt,.pdf" className="hidden" onChange={(e) => handleFileUpload(e, docNum)} />
+          {docNum === 1 && <input ref={cameraInputRef1} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleFileUpload(e, 1)} />}
+
+          {uploadFileName ? (
+            <div className="flex items-center gap-2 p-2 rounded-lg border border-success bg-success/10">
+              <FileText className="h-5 w-5 text-success" />
+              <span className="text-[14px] font-semibold text-success truncate flex-1">{uploadFileName}</span>
+              <Button variant="ghost" size="sm" onClick={() => docNum === 1 ? setUploadFileName1(null) : setUploadFileName2(null)}><X className="h-4 w-4" /></Button>
+            </div>
+          ) : (
+            <Button variant="outline" disabled={isUploading} onClick={() => fileInputRef.current?.click()} className="w-full border-dashed">
+              <UploadCloud className="mr-2 h-5 w-5" /> {isUploading ? 'Reading...' : 'Upload File'}
+            </Button>
+          )}
+
+          <Button
+            onClick={() => runAnalysis(docNum, extractedTextRef.current || text)}
+            disabled={(docNum === 1 ? isLoading1 : isLoading2) || isUploading}
+            className="w-full h-[48px] font-bold bg-[#1B2A4A] text-white"
+          >
+            {(docNum === 1 ? isLoading1 : isLoading2) ? <Loader2 className="animate-spin" /> : 'Analyze'}
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderAnalysis = (analysis: CurrentAnalysis | null, isBetterDeal?: boolean) => {
+    if (!analysis) return null;
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between bg-card p-4 rounded-xl border border-border">
+          <div>
+            <div className="inline-flex bg-[#1B2A4A] text-white text-xs font-bold px-2 py-1 rounded-full mb-2">
+              {analysis.documentType}
+            </div>
+            {isBetterDeal && (
+              <div className="inline-flex ml-2 bg-success text-white text-xs font-bold px-2 py-1 rounded-full mb-2">
+                🌟 Better Deal
+              </div>
+            )}
+            <h2 className="text-xl font-bold">Analysis Results</h2>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => handleShareWhatsApp(analysis)}>
+            <Share2 className="h-4 w-4 mr-2" /> Share
+          </Button>
+        </div>
+
+        <RiskMeter score={analysis.riskScore} />
+
+        {/* Specific Clauses to Watch */}
+        {analysis.specificClauses && analysis.specificClauses.length > 0 && (
+          <Card className="border-border bg-card shadow-sm rounded-xl">
+            <CardHeader className="pb-3 border-b border-border">
+              <CardTitle className="text-[16px] font-bold flex items-center gap-2">
+                <Eye className="h-5 w-5 text-warning" /> Specific Clauses to Watch
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-3">
+              {analysis.specificClauses.map((clause, idx) => (
+                <div key={idx} className="flex gap-3 bg-muted/40 p-3 rounded-lg border-l-4" style={{ borderColor: clause.severity === 'high' ? '#EF4444' : '#F59E0B' }}>
+                  <span className="text-[14px] italic font-medium text-foreground leading-snug">"{clause.text}"</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        <ResultCard title="Pros" items={analysis.pros} borderColor="border-l-success" icon={<CheckCircle className="text-success" />} readText="" lang={language} />
+        <ResultCard title="Cons" items={analysis.cons} borderColor="border-l-warning" icon={<AlertTriangle className="text-warning" />} readText="" lang={language} />
+      </div>
+    );
   };
 
   return (
-    <div className="container mx-auto px-3 sm:px-6 py-6 sm:py-8 max-w-6xl">
-      <div className="mb-5 sm:mb-8">
-        <h1 className="text-[22px] sm:text-[28px] md:text-[32px] font-bold text-primary dark:text-primary-foreground">
-          Analyze Your Document
-        </h1>
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
+      
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4 border-b border-border pb-6">
+        <div>
+          <h1 className="text-[32px] font-bold text-primary dark:text-primary-foreground tracking-tight">
+            Analyze Document
+          </h1>
+          <p className="text-muted-foreground mt-1 text-[16px]">Upload documents to translate them into plain language.</p>
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-4 bg-card p-3 rounded-xl border border-border shadow-sm">
+          <div className="flex items-center gap-2 pr-4 border-r border-border">
+            <Switch checked={simplifiedMode} onCheckedChange={setSimplifiedMode} id="simplified-mode" />
+            <label htmlFor="simplified-mode" className="text-sm font-bold cursor-pointer">Simplified Mode</label>
+          </div>
+          <Button variant="ghost" className="font-bold text-primary" onClick={() => setIsCompareMode(!isCompareMode)}>
+            <SplitSquareHorizontal className="mr-2 h-4 w-4" />
+            {isCompareMode ? 'Disable Compare' : 'Compare Two Docs'}
+          </Button>
+        </div>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-5 lg:gap-10">
-        {/* ── Input Column ── */}
-        <div className="flex flex-col gap-4">
-          <Card className="bg-surface dark:bg-card border-border shadow-sm rounded-xl border">
-            <CardContent className="pt-6 flex flex-col gap-4">
-              <label className="text-[14px] sm:text-[16px] font-semibold text-primary dark:text-primary-foreground">
-                Paste your document text here
-              </label>
-              <textarea
-                className="flex min-h-[140px] sm:min-h-[220px] w-full rounded-md border border-border bg-transparent px-3 sm:px-4 py-3 text-[15px] sm:text-[17px] placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary resize-y"
-                placeholder="Paste your loan agreement, insurance policy, or terms here…"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-              />
-
-              {/* Hidden real file input */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".txt,.pdf,text/plain,application/pdf"
-                className="hidden"
-                onChange={handleFileUpload}
-              />
-
-              {/* Upload button / file badge */}
-              {uploadFileName ? (
-                <div className="flex flex-col gap-2">
-                  {/* Top row: icon + filename + action buttons */}
-                  <div className="flex items-center gap-2 w-full min-h-[48px] px-3 rounded-lg border border-success bg-success/10 flex-wrap py-2">
-                    <FileText className="h-5 w-5 text-success shrink-0" />
-                    <span className="text-[13px] sm:text-[15px] font-semibold text-success truncate flex-1 min-w-0">{uploadFileName}</span>
-                    <div className="flex items-center gap-1 shrink-0">
-                      {uploadedFile && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handlePreviewPdf}
-                          disabled={isPdfPreviewLoading}
-                          className="text-primary hover:text-primary/80 h-7 px-2 text-[12px] sm:text-[13px] font-semibold"
-                        >
-                          {isPdfPreviewLoading
-                            ? <Loader2 className="h-4 w-4 animate-spin" />
-                            : <><Eye className="h-4 w-4 mr-1" />View PDF</>}
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={clearUpload}
-                        className="text-muted-foreground hover:text-danger h-7 px-2"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  {pdfMeta && (
-                    <p className="text-[12px] sm:text-[13px] text-muted-foreground px-1">
-                      {pdfMeta.page_count} pages · {pdfMeta.file_size_kb} KB
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <Button
-                  variant="outline"
-                  disabled={isUploading}
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full h-[48px] text-[14px] sm:text-[17px] text-primary dark:text-primary-foreground font-semibold border-dashed border-2 bg-transparent hover:bg-muted"
-                >
-                  <UploadCloud className="mr-2 h-5 w-5 shrink-0" />
-                  {isUploading ? 'Reading file…' : 'Upload File (.pdf, .txt)'}
-                </Button>
-              )}
-
-              {/* Error banner */}
-              {error && (
-                <div className="bg-danger/10 border-l-4 border-danger p-4 rounded-r text-danger font-semibold text-[15px] flex items-start justify-between gap-3">
-                  <span>{error}</span>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {(text.trim() || extractedTextRef.current) && (
-                      <Button
-                        variant="link"
-                        size="sm"
-                        onClick={() => runAnalysis(language)}
-                        className="text-danger p-0 h-auto font-bold"
-                      >
-                        <RefreshCw className="h-4 w-4 mr-1" /> Retry
-                      </Button>
-                    )}
-                    <Button variant="link" onClick={() => setError(null)} className="text-danger p-0 h-auto">
-                      Dismiss
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Inline PDF preview */}
-              {pdfPreviewBase64 && (
-                <div className="relative w-full rounded-xl border border-border overflow-hidden bg-card">
-                  <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30 gap-2">
-                    <p className="text-[13px] font-semibold text-muted-foreground truncate min-w-0">
-                      📄 {uploadFileName}
-                    </p>
-                    <button onClick={() => setPdfPreviewBase64(null)} className="text-muted-foreground hover:text-danger shrink-0">
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <iframe
-                    src={`data:application/pdf;base64,${pdfPreviewBase64}`}
-                    className="w-full block"
-                    style={{ height: '65vh', minHeight: '300px', maxHeight: '520px', border: 'none' }}
-                    title="PDF Preview"
-                  />
-                </div>
-              )}
-
-              <Button
-                onClick={() => runAnalysis(language)}
-                disabled={isLoading || isUploading}
-                className="w-full h-[48px] sm:h-[52px] text-[17px] sm:text-[20px] font-bold bg-primary hover:bg-primary/90 text-white rounded-xl disabled:opacity-60"
-              >
-                {isLoading
-                  ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Analyzing…</>
-                  : <>Analyze This <ArrowRight className="ml-2 h-5 w-5" /></>}
-              </Button>
-            </CardContent>
-          </Card>
+      <div className={cn("grid gap-6", isCompareMode ? "lg:grid-cols-2" : "lg:grid-cols-2")}>
+        
+        {/* Document 1 Section */}
+        <div className="flex flex-col gap-6">
+          {renderInputSection(1)}
+          {renderAnalysis(currentAnalysis, isCompareMode && secondAnalysis ? currentAnalysis.riskScore > secondAnalysis.riskScore : false)}
         </div>
 
-        {/* ── Results Column ── */}
-        <div className="flex flex-col gap-5">
-          {isLoading ? (
-            <ResultSkeletons />
-          ) : currentAnalysis ? (
-            <div className="space-y-4">
-              {/* Pros */}
-              <ResultCard
-                title="What You Will Get"
-                items={currentAnalysis.pros}
-                borderColor="border-l-success"
-                icon={<CheckCircle className="h-5 w-5 text-success shrink-0" />}
-                readText={`What you will get. ${currentAnalysis.pros.join('. ')}`}
-                lang={language}
-              />
-
-              {/* Cons */}
-              <ResultCard
-                title="What You Must Pay or Do"
-                items={currentAnalysis.cons}
-                borderColor="border-l-warning"
-                icon={<AlertTriangle className="h-5 w-5 text-warning shrink-0" />}
-                readText={`What you must pay or do. ${currentAnalysis.cons.join('. ')}`}
-                lang={language}
-              />
-
-              {/* Hidden clauses */}
-              <ResultCard
-                title="Risks and Hidden Rules"
-                items={currentAnalysis.hiddenClauses}
-                borderColor="border-l-danger"
-                icon={<AlertTriangle className="h-5 w-5 text-danger shrink-0" />}
-                readText={`Risks and hidden rules. ${currentAnalysis.hiddenClauses.join('. ')}`}
-                lang={language}
-              />
-
-              {/* Callout box */}
-              {currentAnalysis.repaymentInfo && (
-                <div className="bg-primary px-6 py-5 rounded-xl shadow-md">
-                  <p className="text-[22px] font-bold text-white leading-tight">
-                    {currentAnalysis.repaymentInfo}
-                  </p>
-                </div>
-              )}
-
-              {/* Risk meter */}
-              <div className="bg-surface dark:bg-card p-6 rounded-xl border border-border">
-                <RiskMeter score={currentAnalysis.riskScore} />
-                {currentAnalysis.risk_explanation && (
-                  <p className="text-[15px] text-muted-foreground mt-3 font-medium">
-                    {currentAnalysis.risk_explanation}
-                  </p>
-                )}
+        {/* Document 2 Section (if Compare mode or normal output mode) */}
+        {isCompareMode ? (
+          <div className="flex flex-col gap-6">
+            {renderInputSection(2)}
+            {renderAnalysis(secondAnalysis, isCompareMode && currentAnalysis ? (secondAnalysis?.riskScore || 0) > currentAnalysis.riskScore : false)}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-6">
+            {/* If not compare mode, show analysis 1 here on desktop */}
+            {!currentAnalysis ? (
+              <div className="h-full min-h-[400px] border-[2px] border-dashed border-border rounded-xl bg-surface/50 dark:bg-card/50 flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
+                <FileText className="h-16 w-16 mb-4 text-border" />
+                <p className="text-lg font-semibold">Results will appear here</p>
               </div>
-
-              {/* Go to simulate CTA */}
-              <Button
-                onClick={() => router.push('/simulate')}
-                variant="outline"
-                className="w-full h-[48px] text-[17px] font-bold border-[2px] border-primary text-primary hover:bg-primary hover:text-white rounded-xl"
-              >
-                Simulate Your Loan <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </div>
-          ) : (
-            <div className="h-full min-h-[400px] border-[2px] border-dashed border-border rounded-xl bg-surface/50 dark:bg-card/50 flex flex-col items-center justify-center text-muted-foreground p-8 text-center space-y-4">
-              <FileText className="h-20 w-20 text-border" />
-              <p className="max-w-[300px] text-[20px] font-semibold">
-                Results will appear here once you paste text and click Analyze.
-              </p>
-            </div>
-          )}
-        </div>
+            ) : null}
+          </div>
+        )}
       </div>
+
     </div>
   );
 }

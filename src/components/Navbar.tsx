@@ -4,33 +4,35 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
+import { useSession } from 'next-auth/react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ShieldCheck, Moon, Sun, User, Menu, X, Mail } from 'lucide-react';
+import { ShieldCheck, Moon, Sun, User, Menu, X, BarChart3, Clock, FileText, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 
 export function Navbar() {
   const pathname = usePathname();
-  const { language, setLanguage, user, setUser } = useAppStore();
+  const { data: session } = useSession();
+  const { language, setLanguage } = useAppStore();
   const { theme, setTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('[data-profile-panel]')) setProfileOpen(false);
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 10);
     };
-    if (profileOpen) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [profileOpen]);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const links = [
     { href: '/', label: 'Home' },
     { href: '/analyze', label: 'Analyze' },
     { href: '/simulate', label: 'Simulate' },
     { href: '/history', label: 'History' },
+    ...(session?.user ? [{ href: '/dashboard', label: 'Dashboard' }] : []),
   ];
 
   const LanguageDropdown = ({ compact }: { compact?: boolean }) => (
@@ -47,7 +49,10 @@ export function Navbar() {
   );
 
   return (
-    <nav className="border-b border-border bg-background/90 backdrop-blur-md sticky top-0 z-50 relative">
+    <nav className={cn(
+      "bg-background/90 backdrop-blur-md sticky top-0 z-50 transition-colors duration-200",
+      isScrolled ? "border-b border-border shadow-sm" : ""
+    )}>
       <div className="container mx-auto flex items-center justify-between h-[72px] px-4">
 
         {/* Left: Logo */}
@@ -79,7 +84,7 @@ export function Navbar() {
 
         {/* Right: Language (desktop) + theme + login + hamburger (mobile) */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Language selector — desktop only (single instance) */}
+          {/* Language selector — desktop only */}
           <div className="hidden lg:block">
             <LanguageDropdown />
           </div>
@@ -97,16 +102,18 @@ export function Navbar() {
           </Button>
 
           {/* Login / user avatar */}
-          {user ? (
-            <Button
-              variant="outline"
-              data-profile-panel
-              className="rounded-full h-[44px] w-[44px] sm:w-auto sm:px-4 font-bold bg-card border-border flex items-center gap-2"
-              onClick={() => setProfileOpen(!profileOpen)}
-            >
-              <User className="h-[18px] w-[18px] text-success shrink-0" />
-              <span className="hidden md:inline">{user.name}</span>
-            </Button>
+          {session?.user ? (
+            <Link href="/profile" className="hidden sm:block">
+              <Button
+                variant="outline"
+                className="rounded-full h-[44px] w-[44px] sm:w-auto sm:px-4 font-bold bg-card border-border flex items-center gap-2 hover:border-success hover:bg-success/10 transition-colors"
+              >
+                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-xs">
+                  {session.user.name?.charAt(0).toUpperCase() || 'U'}
+                </div>
+                <span className="hidden md:inline text-primary dark:text-primary-foreground">{session.user.name}</span>
+              </Button>
+            </Link>
           ) : (
             <Link href="/login" className="hidden sm:block">
               <Button
@@ -132,88 +139,71 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* Profile dropdown panel */}
-      {profileOpen && user && (
-        <div
-          data-profile-panel
-          className="absolute right-2 sm:right-4 top-[76px] z-50 w-[calc(100vw-16px)] sm:w-[300px] bg-card border border-border rounded-2xl shadow-xl p-6 flex flex-col gap-4"
-        >
-          <button onClick={() => setProfileOpen(false)} className="absolute top-3 right-3 text-muted-foreground hover:text-primary">
-            <X className="h-5 w-5" />
-          </button>
-          <div className="flex flex-col items-center gap-3 pb-4 border-b border-border">
-            <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-white text-[24px] font-bold">
-              {user.name?.charAt(0).toUpperCase() ?? 'U'}
-            </div>
-            <div className="text-center">
-              <p className="text-[18px] font-bold text-primary dark:text-primary-foreground">{user.name}</p>
-              <p className="text-[14px] text-muted-foreground">{user.email}</p>
-            </div>
-          </div>
-          <div className="space-y-3">
-            <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-xl">
-              <User className="h-5 w-5 text-muted-foreground shrink-0" />
-              <div>
-                <p className="text-[12px] text-muted-foreground font-semibold uppercase tracking-wide">Full Name</p>
-                <p className="text-[15px] font-semibold text-foreground">{user.name}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-xl">
-              <Mail className="h-5 w-5 text-muted-foreground shrink-0" />
-              <div>
-                <p className="text-[12px] text-muted-foreground font-semibold uppercase tracking-wide">Email</p>
-                <p className="text-[15px] font-semibold text-foreground break-all">{user.email}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-xl">
-              <ShieldCheck className="h-5 w-5 text-success shrink-0" />
-              <div>
-                <p className="text-[12px] text-muted-foreground font-semibold uppercase tracking-wide">Account Status</p>
-                <p className="text-[15px] font-semibold text-success">Verified</p>
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={() => { setUser(null); setProfileOpen(false); }}
-            className="w-full h-[44px] rounded-xl border-2 border-danger text-danger font-bold text-[15px] hover:bg-danger hover:text-white transition-colors"
-          >
-            Sign Out
-          </button>
-        </div>
-      )}
-
-      {/* Mobile drawer */}
+      {/* Mobile full drawer */}
       {mobileOpen && (
-        <div className="lg:hidden border-t border-border bg-card px-4 py-4 space-y-1">
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              onClick={() => setMobileOpen(false)}
-              className={cn(
-                'block text-[16px] font-semibold transition-colors hover:text-success px-4 py-3 rounded-md',
-                pathname === link.href ? 'text-success bg-success/10' : 'text-muted-foreground',
-              )}
-            >
-              {link.label}
-            </Link>
-          ))}
-          {/* Language inside mobile drawer — single instance */}
-          <div className="pt-3 border-t border-border mt-2">
-            <p className="text-[12px] uppercase font-semibold text-muted-foreground mb-2 px-4">Language</p>
-            <div className="px-4">
-              <LanguageDropdown />
-            </div>
-          </div>
-          {!user && (
-            <div className="px-4 pt-2">
-              <Link href="/login" onClick={() => setMobileOpen(false)}>
-                <Button className="w-full h-[44px] font-bold bg-primary hover:bg-primary/90 text-white rounded-xl">
-                  <User className="mr-2 h-4 w-4" /> Login
+        <div className="fixed inset-0 top-[72px] bg-background z-40 lg:hidden overflow-y-auto pb-20">
+          <div className="flex flex-col p-4 space-y-6">
+            
+            {/* User Profile Area (Mobile) */}
+            {session?.user ? (
+              <div className="flex items-center gap-4 bg-card p-4 rounded-xl border-[2px] border-border">
+                <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-white font-bold text-xl">
+                  {session.user.name?.charAt(0).toUpperCase() || 'U'}
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold text-[18px] text-primary dark:text-primary-foreground">{session.user.name}</p>
+                  <p className="text-[13px] text-muted-foreground truncate">{session.user.email}</p>
+                </div>
+                <Link href="/profile" onClick={() => setMobileOpen(false)}>
+                  <Button size="icon" variant="ghost" className="h-10 w-10">
+                    <Settings className="h-5 w-5 text-muted-foreground" />
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <Link href="/login" onClick={() => setMobileOpen(false)} className="w-full">
+                <Button className="w-full h-[52px] font-bold bg-[#1B2A4A] hover:bg-[#1B2A4A]/90 text-white rounded-xl text-[16px]">
+                  <User className="mr-2 h-5 w-5" /> Sign In or Register
                 </Button>
               </Link>
+            )}
+
+            {/* Navigation Links */}
+            <div className="space-y-1">
+              <p className="text-[12px] uppercase font-bold text-muted-foreground tracking-wider mb-2 px-2">Navigation</p>
+              {links.map((link) => {
+                let Icon = FileText;
+                if (link.href === '/simulate') Icon = BarChart3;
+                else if (link.href === '/history') Icon = Clock;
+                else if (link.href === '/') Icon = ShieldCheck;
+                
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setMobileOpen(false)}
+                    className={cn(
+                      'flex items-center gap-3 text-[16px] font-bold transition-colors px-4 py-3.5 rounded-xl border-[2px] border-transparent hover:border-border hover:bg-card',
+                      pathname === link.href ? 'border-success/50 bg-success/10 text-success' : 'text-primary dark:text-primary-foreground',
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
+                    {link.label}
+                  </Link>
+                );
+              })}
             </div>
-          )}
+
+            {/* Language */}
+            <div className="space-y-2">
+              <p className="text-[12px] uppercase font-bold text-muted-foreground tracking-wider mb-2 px-2">Preferences</p>
+              <div className="bg-card p-4 rounded-xl border-[2px] border-border flex items-center justify-between">
+                <span className="font-bold text-primary dark:text-primary-foreground">Language</span>
+                <LanguageDropdown />
+              </div>
+            </div>
+
+          </div>
         </div>
       )}
     </nav>

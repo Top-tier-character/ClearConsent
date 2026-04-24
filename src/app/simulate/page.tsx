@@ -429,6 +429,60 @@ export default function SimulatePage() {
                 )}
               </Card>
 
+              {/* Credit Score Impact */}
+              <Card className="bg-surface dark:bg-card border border-border shadow-sm rounded-xl p-6">
+                <p className="text-[18px] font-bold mb-4 text-primary dark:text-primary-foreground">Predicted Credit Score Impact</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-success/10 border-l-[4px] border-success p-4 rounded-r-lg">
+                    <p className="text-[13px] text-muted-foreground font-semibold uppercase mb-1">If Paid On Time</p>
+                    <p className="text-[24px] font-bold text-success">+15 to +25 pts</p>
+                  </div>
+                  <div className="bg-danger/10 border-l-[4px] border-danger p-4 rounded-r-lg">
+                    <p className="text-[13px] text-muted-foreground font-semibold uppercase mb-1">If Missed 1 EMI</p>
+                    <p className="text-[24px] font-bold text-danger">-30 to -50 pts</p>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Bank Rate Comparison */}
+              <Card className="bg-surface dark:bg-card border border-border shadow-sm rounded-xl p-6">
+                <p className="text-[18px] font-bold mb-4 text-primary dark:text-primary-foreground">Market Rate Comparison</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-border text-muted-foreground">
+                        <th className="pb-2 font-semibold">Bank</th>
+                        <th className="pb-2 font-semibold">Interest Rate</th>
+                        <th className="pb-2 font-semibold">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b border-border/50">
+                        <td className="py-3 font-semibold text-primary dark:text-primary-foreground">SBI (State Bank of India)</td>
+                        <td className="py-3 text-muted-foreground">11.15% - 14.30%</td>
+                        <td className="py-3">
+                          {numericInputs.rate > 14.3 ? <Badge className="bg-danger text-white">Worse</Badge> : <Badge className="bg-success text-white">Better</Badge>}
+                        </td>
+                      </tr>
+                      <tr className="border-b border-border/50">
+                        <td className="py-3 font-semibold text-primary dark:text-primary-foreground">HDFC Bank</td>
+                        <td className="py-3 text-muted-foreground">10.50% - 21.00%</td>
+                        <td className="py-3">
+                          {numericInputs.rate > 21.0 ? <Badge className="bg-danger text-white">Worse</Badge> : <Badge className="bg-success text-white">Better</Badge>}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="py-3 font-semibold text-primary dark:text-primary-foreground">Bajaj Finance</td>
+                        <td className="py-3 text-muted-foreground">11.00% - 35.00%</td>
+                        <td className="py-3">
+                          {numericInputs.rate > 35.0 ? <Badge className="bg-danger text-white">Worse</Badge> : <Badge className="bg-success text-white">Better</Badge>}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+
               {/* 12-month timeline */}
               <div>
                 <p className="text-[18px] font-bold mb-4 text-primary dark:text-primary-foreground">12-Month Savings Timeline</p>
