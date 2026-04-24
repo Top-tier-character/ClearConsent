@@ -12,7 +12,16 @@ import bcrypt from 'bcryptjs';
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '../../convex/_generated/api';
 
-const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+/**
+ * Lazily initialize the Convex client inside request handlers only.
+ * Prevents a module-level crash if NEXT_PUBLIC_CONVEX_URL is undefined
+ * at import time (e.g. during static analysis or misconfigured deploys).
+ */
+function getConvexClient(): ConvexHttpClient {
+  const url = process.env.NEXT_PUBLIC_CONVEX_URL;
+  if (!url) throw new Error('NEXT_PUBLIC_CONVEX_URL is not configured.');
+  return new ConvexHttpClient(url);
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -32,7 +41,10 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Email and password are required.');
         }
 
-        const user = await convexClient.query(api.queries.getUserByEmail, {
+        // Client is created here — inside the request, never at module level
+        const client = getConvexClient();
+
+        const user = await client.query(api.queries.getUserByEmail, {
           email: credentials.email,
         });
 

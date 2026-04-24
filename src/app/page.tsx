@@ -7,8 +7,15 @@ import { authOptions } from '@/lib/authOptions';
 import { redirect } from 'next/navigation';
 
 export default async function LandingPage() {
-  const session = await getServerSession(authOptions);
-  
+  let session = null;
+  try {
+    session = await getServerSession(authOptions);
+  } catch (err) {
+    // NextAuth misconfiguration (missing secret, bad Google creds, etc.) must not
+    // crash the entire homepage — log it and continue as unauthenticated.
+    console.error('[authOptions] getServerSession failed:', err);
+  }
+
   if (session?.user) {
     redirect('/dashboard');
   }
