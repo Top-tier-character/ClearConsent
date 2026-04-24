@@ -96,6 +96,15 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'clearconsent-storage',
+      version: 2,
+      migrate: (persistedState: any, version: number) => {
+        if (version < 2) {
+          // Clear history from old schema versions to prevent type-mismatch crashes
+          // (e.g. summary being an object instead of a string)
+          return { ...persistedState, history: [] };
+        }
+        return persistedState;
+      },
       partialize: (state) => ({
         history: state.history,
         currentAnalysis: state.currentAnalysis,

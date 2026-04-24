@@ -170,11 +170,10 @@ export default function DashboardPage() {
               {safeHistory.slice(0, 5).map((item) => {
                 const level = getRiskLevel(item.riskScore);
                 // item.details holds the CurrentAnalysis or simulation result object
-                const docName: string =
-                  (item.details as any)?.documentType ??
-                  (item.details as any)?.document_type ??
-                  (item.type === 'simulation' ? 'Loan Simulation' : 'Financial Document');
-                const summary: string = (item.details as any)?.summary ?? '';
+                const rawDocName = (item.details as any)?.documentType ?? (item.details as any)?.document_type;
+                const docName: string = typeof rawDocName === 'string' ? rawDocName : (item.type === 'simulation' ? 'Loan Simulation' : 'Financial Document');
+                const rawSummary = (item.details as any)?.summary;
+                const summary: string = typeof rawSummary === 'string' ? rawSummary : '';
 
                 return (
                   <Card key={item.id} className="bg-surface dark:bg-card border-border border-[2px] shadow-sm rounded-xl hover:shadow-md transition-shadow">
@@ -195,7 +194,7 @@ export default function DashboardPage() {
                           </h4>
                           <p className="text-[13px] text-muted-foreground">
                             {new Date(item.date).toLocaleDateString()}
-                            {summary ? ` • ${summary.substring(0, 60)}…` : ''}
+                            {summary && typeof summary === 'string' && summary.length > 0 ? ` • ${summary.substring(0, 60)}…` : ''}
                           </p>
                         </div>
                       </div>
