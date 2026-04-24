@@ -53,3 +53,15 @@ export const getUserByEmail = query({
       .first();
   },
 });
+
+/** Return last N chat messages for a session (for AI assistant context) */
+export const getChatHistory = query({
+  args: { session_id: v.string(), limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("chat_messages")
+      .withIndex("by_session_id", (q) => q.eq("session_id", args.session_id))
+      .order("desc")
+      .take(args.limit ?? 20);
+  },
+});

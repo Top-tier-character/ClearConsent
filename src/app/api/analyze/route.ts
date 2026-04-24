@@ -4,11 +4,19 @@ import { parseGroqJson } from '@/lib/parseGroq';
 import { buildAnalyzePrompt, buildAnalyzeRetryPrompt } from '@/lib/prompts';
 import type { Language } from '@/lib/store';
 
-// Shape of the structured JSON Groq must return for document analysis
+// Shape of the structured JSON Groq returns for document analysis
+export interface SpecificClause {
+  quote: string;
+  explanation: string;
+  severity: 'high' | 'medium' | 'low';
+}
+
 export interface AnalyzeResult {
+  document_type: string;
   pros: string[];
   cons: string[];
   hidden_clauses: string[];
+  specific_clauses: SpecificClause[];
   callout_text: string;
   risk_score: number;
   risk_explanation: string;
@@ -26,13 +34,12 @@ export interface AnalyzeResult {
   };
 }
 
-
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
 
   try {
     // ── 1. Parse body ──────────────────────────────────────────────────────
-    let body: { text?: unknown; language?: unknown };
+    let body: { text?: unknown; language?: unknown; simplified?: unknown };
     try {
       body = await req.json();
     } catch {
@@ -42,15 +49,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ── 2. Validate required fields ────────────────────────────────────────
-    const missing: string[] = [];
-    if (!body.text || typeof body.text !== 'string' || !body.text.trim()) missing.push('text');
-    if (missing.length > 0) {
+    // ── 2. Validate ────────────────────────────────────────────────────────
+    if (!body.text || typeof body.text !== 'string' || !body.text.trim()) {
       return NextResponse.json(
-        {
-          error: 'Missing required fields',
-          details: `The following fields are required: ${missing.join(', ')}.`,
-        },
+        { error: 'Missing required field', details: 'text is required and must be a non-empty string.' },
         { status: 400, headers: { 'X-Response-Time': `${Date.now() - startTime}ms` } }
       );
     }
@@ -58,20 +60,21 @@ export async function POST(req: NextRequest) {
     const text = (body.text as string).trim();
     const language: Language =
       body.language === 'hi' || body.language === 'mr' ? (body.language as Language) : 'en';
+    const simplified = body.simplified === true;
 
-    // ── 3. First Groq attempt ──────────────────────────────────────────────
+    // ── 3. Groq call (with one retry on parse failure) ─────────────────────
     let result: AnalyzeResult;
 
     const attempt = async (retry: boolean): Promise<string> => {
       const prompt = retry
-        ? buildAnalyzeRetryPrompt(text, language)
-        : buildAnalyzePrompt(text, language);
+        ? buildAnalyzeRetryPrompt(text, language, simplified)
+        : buildAnalyzePrompt(text, language, simplified);
 
       const completion = await groq.chat.completions.create({
         model: GROQ_MODEL,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.3,
-        max_tokens: 1024,
+        max_tokens: 1800,
       });
 
       return completion.choices[0]?.message?.content ?? '';
@@ -81,23 +84,22 @@ export async function POST(req: NextRequest) {
 
     try {
       result = parseGroqJson<AnalyzeResult>(rawResponse);
-    } catch (parseError) {
-      // ── 4. Retry once with stricter prompt ──────────────────────────────
+    } catch {
       rawResponse = await attempt(true);
       try {
         result = parseGroqJson<AnalyzeResult>(rawResponse);
-      } catch (retryParseError) {
+      } catch (retryErr) {
         return NextResponse.json(
           {
             error: 'AI response parsing failed',
-            details: `Could not parse the AI response as JSON after two attempts. ${retryParseError instanceof Error ? retryParseError.message : String(retryParseError)}`,
+            details: `Could not parse AI response as JSON after two attempts. ${retryErr instanceof Error ? retryErr.message : String(retryErr)}`,
           },
           { status: 500, headers: { 'X-Response-Time': `${Date.now() - startTime}ms` } }
         );
       }
     }
 
-    // ── 5. Return the structured analysis ──────────────────────────────────
+    // ── 4. Return ──────────────────────────────────────────────────────────
     return NextResponse.json(result, {
       status: 200,
       headers: { 'X-Response-Time': `${Date.now() - startTime}ms` },

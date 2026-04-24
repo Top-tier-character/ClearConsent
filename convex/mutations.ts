@@ -90,7 +90,7 @@ export const saveConsentRecord = mutation({
         user_answers: quiz_answers.map((a) => a.user_answer),
         correct_answers: quiz_answers.map((a) => a.correct_answer),
         score: consentArgs.quiz_score,
-        attempts: 1, // Defaulting to 1 attempt for now
+        attempts: 1,
       });
     }
 
@@ -127,11 +127,10 @@ export const updateRiskLogConsent = mutation({
     timestamp: v.number(),
   },
   handler: async (ctx, args) => {
-    // Find the most recent risk log for this session
     const logs = await ctx.db
       .query("risk_logs")
       .withIndex("by_session_id", (q) => q.eq("session_id", args.session_id))
-      .order("desc") // newest first
+      .order("desc")
       .take(1);
     
     if (logs.length > 0) {
@@ -164,7 +163,6 @@ export const createUser = mutation({
     password_hash: v.string(),
   },
   handler: async (ctx, args) => {
-    // Guard against duplicate emails
     const existing = await ctx.db
       .query("users")
       .withIndex("by_email", (q) => q.eq("email", args.email))
@@ -180,5 +178,45 @@ export const createUser = mutation({
       password_hash: args.password_hash,
       created_at: Date.now(),
     });
+  },
+});
+
+/** Update user name and/or email */
+export const updateUser = mutation({
+  args: {
+    email: v.string(),           // lookup key (current email)
+    new_name: v.optional(v.string()),
+    new_email: v.optional(v.string()),
+    new_password_hash: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .first();
+
+    if (!user) throw new Error("User not found.");
+
+    const patch: Record<string, string> = {};
+    if (args.new_name) patch.name = args.new_name;
+    if (args.new_email) patch.email = args.new_email;
+    if (args.new_password_hash) patch.password_hash = args.new_password_hash;
+
+    await ctx.db.patch(user._id, patch);
+    return true;
+  },
+});
+
+/** Persist a single chat turn (user or assistant) */
+export const saveChatMessage = mutation({
+  args: {
+    session_id: v.string(),
+    timestamp: v.number(),
+    role: v.string(),
+    content: v.string(),
+    language: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("chat_messages", args);
   },
 });

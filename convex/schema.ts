@@ -67,4 +67,13 @@ export default defineSchema({
     password_hash: v.string(),
     created_at: v.number(),
   }).index("by_email", ["email"]),
+
+  // Chat message history for AI assistant
+  chat_messages: defineTable({
+    session_id: v.string(),
+    timestamp: v.number(),
+    role: v.string(),        // "user" | "assistant"
+    content: v.string(),
+    language: v.optional(v.string()),
+  }).index("by_session_id", ["session_id"]),
 });

@@ -21,7 +21,6 @@ import { api } from '../../../../convex/_generated/api';
 
 interface SimulateBody {
   session_id?: unknown;
-
   loan_amount?: unknown;
   interest_rate?: unknown;
   tenure_months?: unknown;
@@ -68,7 +67,6 @@ export async function POST(req: NextRequest) {
     const language: Language =
       body.language === 'hi' || body.language === 'mr' ? (body.language as Language) : 'en';
 
-    // Validate numeric sanity
     if ([loan_amount, interest_rate, tenure_months, monthly_income].some((v) => isNaN(v) || v < 0)) {
       return NextResponse.json(
         { error: 'Invalid field values', details: 'All numeric fields must be non-negative numbers.' },
@@ -76,7 +74,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ── 3. Server-side financial calculations ──────────────────────────────
+    // ── 3. Financial calculations ──────────────────────────────────────────
     const emi = calculateEMI(loan_amount, interest_rate, tenure_months);
     const total_repayment = totalRepayment(emi, tenure_months);
     const total_interest = totalInterest(total_repayment, loan_amount);
@@ -88,7 +86,36 @@ export async function POST(req: NextRequest) {
     const projection = buildProjection(emi, monthly_income, tenure_months);
     const what_if_scenarios = buildWhatIfScenarios(emi, monthly_income);
 
-    // ── 4. Ask Groq for narrative text ─────────────────────────────────────
+    // ── 4. Credit score impact (pure math, no Groq) ────────────────────────
+    const on_time_gain = Math.round(15 + tenure_months);
+    const missed_ratio_penalty = Math.round((emi / monthly_income) * 30);
+    const missed_payment_drop = 50 + missed_ratio_penalty;
+
+    const credit_score_impact = {
+      on_time_gain,
+      missed_payment_drop,
+      explanation:
+        language === 'hi'
+          ? `12 महीने समय पर भुगतान से आपका क्रेडिट स्कोर लगभग ${on_time_gain} अंक बढ़ सकता है। 2 चूके हुए भुगतान से यह ${missed_payment_drop} अंक गिर सकता है।`
+          : language === 'mr'
+          ? `12 महिने वेळेवर पेमेंट केल्यास क्रेडिट स्कोर सुमारे ${on_time_gain} अंकांनी वाढू शकतो. 2 चुकलेल्या पेमेंटमुळे ${missed_payment_drop} अंकांनी घट होऊ शकते.`
+          : `Paying on time for 12 months could raise your credit score by ~${on_time_gain} points. Missing 2 payments could drop it by ~${missed_payment_drop} points.`,
+    };
+
+    // ── 5. Market rate comparison (hardcoded benchmark) ────────────────────
+    const MARKET_AVERAGE_PERSONAL_LOAN = 14.5;
+    const difference = parseFloat((interest_rate - MARKET_AVERAGE_PERSONAL_LOAN).toFixed(2));
+    const market_verdict =
+      difference > 0.5 ? 'above_market' : difference < -0.5 ? 'below_market' : 'at_market';
+
+    const market_rate_comparison = {
+      document_rate: interest_rate,
+      market_average: MARKET_AVERAGE_PERSONAL_LOAN,
+      verdict: market_verdict as 'above_market' | 'below_market' | 'at_market',
+      difference,
+    };
+
+    // ── 6. Groq narrative ──────────────────────────────────────────────────
     const narrativePrompt = buildSimulateNarrativePrompt({
       language,
       emi,
@@ -115,11 +142,10 @@ export async function POST(req: NextRequest) {
     try {
       narrativeData = parseGroqJson(rawNarrative);
     } catch {
-      // Non-fatal: return empty narrative strings rather than failing the whole request
       narrativeData = { risk_narrative: '', advice_tips: [] };
     }
 
-    // ── 5. Save risk log ───────────────────────────────────────────────────
+    // ── 7. Save risk log ───────────────────────────────────────────────────
     if (body.session_id) {
       await convex.mutation(api.mutations.saveRiskLog, {
         session_id: String(body.session_id),
@@ -140,7 +166,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ── 6. Return combined response ────────────────────────────────────────
+    // ── 8. Return combined response ────────────────────────────────────────
     return NextResponse.json(
       {
         // Inputs echoed back
@@ -150,7 +176,7 @@ export async function POST(req: NextRequest) {
         monthly_income,
         language,
 
-        // Calculated figures
+        // Core calculations
         emi,
         total_repayment,
         total_interest,
@@ -162,7 +188,11 @@ export async function POST(req: NextRequest) {
         projection,
         what_if_scenarios,
 
-        // Groq-generated narrative
+        // New: credit & market enrichment
+        credit_score_impact,
+        market_rate_comparison,
+
+        // Groq narrative
         risk_narrative: narrativeData.risk_narrative ?? '',
         advice_tips: narrativeData.advice_tips ?? [],
       },
