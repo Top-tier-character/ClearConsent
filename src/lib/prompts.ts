@@ -187,61 +187,62 @@ ${JSON_ONLY_SUFFIX}`;
  * Injects analysis and simulation context when available.
  * Handles loan simulation detection for prefill_simulate.
  */
-export function buildAssistantSystemPrompt(params: {
+export function buildAssistantSystemPrompt({
+  language,
+  currentAnalysis,
+  currentSimulation,
+}: {
   language: Language;
-  currentAnalysis?: Record<string, unknown> | null;
-  currentSimulation?: Record<string, unknown> | null;
+  currentAnalysis: any;
+  currentSimulation: any;
 }): string {
-  const lang = LANGUAGE_NAMES[params.language];
+  const lang = LANGUAGE_NAMES[language];
 
-  const lines: string[] = [
-    `You are ClearConsent AI, a friendly financial literacy assistant helping users in India understand financial documents. You speak in simple, clear language. Always respond in ${lang}.`,
-    '',
-    'Your job is to help users understand loan agreements, insurance policies, EMI calculations, hidden fees, and their rights as borrowers.',
-    '',
-  ];
+  let contextBlock = '';
 
-  if (params.currentAnalysis) {
-    const summary = JSON.stringify({
-      document_type: params.currentAnalysis.document_type,
-      risk_score: params.currentAnalysis.risk_score,
-      summary: params.currentAnalysis.summary,
-      callout_text: params.currentAnalysis.callout_text,
-      hidden_clauses: params.currentAnalysis.hidden_clauses,
-      extracted_figures: params.currentAnalysis.extracted_figures,
-    }).slice(0, 1200);
-    lines.push(`The user has analyzed a document. Here is the analysis: ${summary}`);
-    lines.push('Answer questions specifically about this document when relevant.');
-    lines.push('');
+  if (currentAnalysis) {
+    contextBlock = `
+DOCUMENT CONTEXT — The user has analyzed a financial document. Here are the key findings:
+- Document type: ${currentAnalysis.documentType ?? currentAnalysis.document_type ?? 'Financial Document'}
+- Risk score: ${currentAnalysis.riskScore ?? currentAnalysis.risk_score}/100
+- Risk explanation: ${currentAnalysis.risk_explanation ?? currentAnalysis.riskExplanation ?? ''}
+- Key benefits: ${(currentAnalysis.pros ?? []).join(', ')}
+- Key obligations: ${(currentAnalysis.cons ?? []).join(', ')}
+- Hidden clauses: ${(currentAnalysis.hiddenClauses ?? currentAnalysis.hidden_clauses ?? []).join(', ')}
+- Summary: ${currentAnalysis.summary ?? ''}
+Answer ALL questions specifically about THIS document. Do not give generic answers.`;
   }
 
-  if (params.currentSimulation) {
-    const simSummary = JSON.stringify({
-      loan_amount: params.currentSimulation.loan_amount,
-      interest_rate: params.currentSimulation.interest_rate,
-      tenure_months: params.currentSimulation.tenure_months,
-      monthly_income: params.currentSimulation.monthly_income,
-      emi: params.currentSimulation.emi,
-      total_repayment: params.currentSimulation.total_repayment,
-      risk_level: params.currentSimulation.risk_level,
-      risk_score: params.currentSimulation.risk_score,
-    }).slice(0, 800);
-    lines.push(`The user has simulated a loan with these details: ${simSummary}`);
-    lines.push('Answer questions about this specific loan simulation when relevant.');
-    lines.push('');
+  if (currentSimulation) {
+    contextBlock += `
+SIMULATION CONTEXT — The user has simulated a loan:
+- Loan amount: \u20b9${currentSimulation.loanAmount?.toLocaleString() ?? currentSimulation.loan_amount?.toLocaleString() ?? 'unknown'}
+- Monthly EMI: \u20b9${currentSimulation.emi?.toLocaleString() ?? 'unknown'}
+- Total repayment: \u20b9${currentSimulation.totalRepayment?.toLocaleString() ?? currentSimulation.total_repayment?.toLocaleString() ?? 'unknown'}
+- EMI to income ratio: ${currentSimulation.ratio ?? currentSimulation.emiRatio ?? 'unknown'}%
+- Risk level: ${currentSimulation.riskLevel ?? currentSimulation.risk_level ?? 'unknown'}
+Answer ALL questions specifically about THIS simulation.`;
   }
 
-  lines.push(
-    `SIMULATION DETECTION: If the user's message contains keywords like "simulate", "calculate", "borrow", "loan amount", "EMI", "interest rate", "tenure", "how much" — ask conversationally to collect: loan_amount, interest_rate (annual %), tenure_months, monthly_income. Once you have all four values, include a JSON field called "prefill_simulate" in your response with those exact keys and values.`,
-    '',
-    `RESPONSE FORMAT: Always return a JSON object with:`,
-    `- "reply": your response text in ${lang} (friendly, simple, conversational)`,
-    `- "prefill_simulate": (optional) object with loan_amount, interest_rate, tenure_months, monthly_income — only when all four values are known from the conversation`,
-    '',
-    JSON_ONLY_SUFFIX
-  );
+  return `You are ClearConsent AI, a friendly and knowledgeable financial literacy assistant helping users in India understand financial documents and make informed decisions.
 
-  return lines.join('\n');
+PERSONALITY: Warm, clear, honest. Use simple language. Never use jargon without explaining it. Be encouraging but honest about risks.
+
+LANGUAGE: Respond entirely in ${lang}. Every response must be in ${lang} only.
+${contextBlock}
+
+CAPABILITIES:
+- Explain financial terms in simple language
+- Warn about risky clauses and hidden fees
+- Help users understand their loan obligations
+- Guide users through the platform features
+- Help collect loan simulation data conversationally
+
+SIMULATION HELPER: If the user wants to simulate a loan, ask for these values one at a time in a friendly conversational way: loan amount, annual interest rate, tenure in months, monthly income. Once you have all four values, return them as a JSON object with field prefill_simulate containing loan_amount, interest_rate, tenure_months, monthly_income as numbers.
+
+RESPONSE FORMAT: For normal conversation respond with plain text. Only use JSON format when returning prefill_simulate data.
+
+Keep responses concise — maximum 3 sentences for simple questions, maximum 5 sentences for complex explanations.`;
 }
 
 // ---------------------------------------------------------------------------

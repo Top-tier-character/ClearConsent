@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import type { ChatMessage } from '@/lib/store';
 
 export function AiAssistant() {
-  const { chatHistory, addChatMessage, clearChatHistory } = useAppStore();
+  const { chatHistory, addChatMessage, clearChatHistory, currentAnalysis, currentSimulation, language } = useAppStore();
   const [isOpen, setIsOpen] = useState(false);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -23,25 +23,61 @@ export function AiAssistant() {
     }
   }, [chatHistory, isOpen, isLoading]);
 
+  // Proactive greeting when chat is first opened
+  useEffect(() => {
+    if (isOpen && chatHistory.length === 0) {
+      const { currentAnalysis, currentSimulation } = useAppStore.getState();
+      let proactive = "Hi! I am ClearConsent AI. I can help you understand any financial document, explain loan terms, or help you simulate a loan. What would you like to know?";
+      if (currentAnalysis) {
+        proactive = `I can see you have analyzed a document with a risk score of ${(currentAnalysis as any).riskScore}/100. Would you like me to explain any specific part of the analysis?`;
+      } else if (currentSimulation) {
+        proactive = `I can see you have simulated a loan with a monthly EMI of ₹${(currentSimulation as any).emi?.toLocaleString()}. Would you like me to explain what this means for your finances?`;
+      }
+      addChatMessage({ role: 'assistant', content: proactive });
+    }
+  }, [isOpen]);
+
   const handleSend = async () => {
     if (!inputText.trim()) return;
-    
+
     const userMsg: ChatMessage = { role: 'user', content: inputText };
     addChatMessage(userMsg);
     setInputText('');
     setIsLoading(true);
 
     try {
+      const { currentAnalysis, currentSimulation, language } = useAppStore.getState();
+
       const response = await fetch('/api/assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [...chatHistory, userMsg] }),
+        body: JSON.stringify({
+          message: inputText.trim(),
+          chat_history: chatHistory,
+          context: {
+            currentAnalysis: currentAnalysis ?? null,
+            currentSimulation: currentSimulation ?? null,
+          },
+          language: language ?? 'en',
+          session_id:
+            typeof window !== 'undefined'
+              ? (localStorage.getItem('clearconsent-session-id') ?? 'guest')
+              : 'guest',
+        }),
       });
 
       if (!response.ok) throw new Error('API failed');
       const data = await response.json();
-      
+
       addChatMessage({ role: 'assistant', content: data.reply });
+
+      if (data.prefill_simulate) {
+        useAppStore.getState().setSimulationPrefill(data.prefill_simulate);
+        addChatMessage({
+          role: 'assistant',
+          content: '✓ I have filled in the loan details. Click here to go to the Simulate page →',
+        });
+      }
     } catch (error) {
       addChatMessage({ role: 'assistant', content: "Sorry, I'm having trouble connecting right now." });
     } finally {

@@ -5,7 +5,7 @@ import groq, { GROQ_MODEL } from '@/lib/groq';
 import { parseGroqJson } from '@/lib/parseGroq';
 import { buildAssistantSystemPrompt } from '@/lib/prompts';
 import type { Language } from '@/lib/store';
-import { convex } from '@/lib/convex';
+import { convexClient } from '@/lib/convex';
 import { api } from '../../../../convex/_generated/api';
 
 interface ChatMessage {
@@ -88,19 +88,17 @@ export async function POST(req: NextRequest) {
     // ── 6. Persist both turns to Convex ───────────────────────────────────
     if (session_id) {
       const now = Date.now();
-      await convex.mutation(api.mutations.saveChatMessage as any, {
+      await convexClient().mutation(api.mutations.saveChatMessage as any, {
         session_id: String(session_id),
         timestamp: now,
         role: 'user',
         content: message.trim(),
-        language: lang,
       });
-      await convex.mutation(api.mutations.saveChatMessage as any, {
+      await convexClient().mutation(api.mutations.saveChatMessage as any, {
         session_id: String(session_id),
         timestamp: now + 1,
         role: 'assistant',
         content: reply,
-        language: lang,
       });
     }
 
