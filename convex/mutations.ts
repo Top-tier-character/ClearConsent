@@ -318,3 +318,47 @@ export const saveChatMessage = mutation({
     return await ctx.db.insert("chat_messages", args);
   },
 });
+
+/** Save a document analysis result for history and comparison */
+export const saveDocumentAnalysis = mutation({
+  args: {
+    session_id: v.string(),
+    user_id: v.optional(v.string()),
+    timestamp: v.number(),
+    document_type: v.string(),
+    clearconsent_score: v.number(),
+    risk_flags: v.any(),
+    extracted_figures: v.any(),
+    summary: v.string(),
+    language: v.string(),
+    document_hash: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("document_analyses", args);
+  },
+});
+
+/**
+ * Increment per-user aggregate stats after a document is analyzed.
+ * total_documents_analyzed += 1
+ * total_red_flags_found += red_flags_count
+ */
+export const incrementUserStats = mutation({
+  args: {
+    email: v.string(),
+    red_flags_count: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .first();
+
+    if (!user) return; // guest user — silently skip
+
+    await ctx.db.patch(user._id, {
+      total_documents_analyzed: (user.total_documents_analyzed ?? 0) + 1,
+      total_red_flags_found: (user.total_red_flags_found ?? 0) + args.red_flags_count,
+    });
+  },
+});

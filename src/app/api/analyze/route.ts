@@ -103,9 +103,31 @@ export async function POST(req: NextRequest) {
       suggested_questions: Array.isArray(result.suggested_questions)
         ? result.suggested_questions
         : [],
+      clearconsent_score:
+        typeof result.clearconsent_score === 'number' ? result.clearconsent_score : 100 - riskScore,
     };
 
+    // ── Non-blocking Convex persistence ───────────────────────────────────
+    try {
+      const { convexClient } = await import('@/lib/convex');
+      const { api } = await import('../../../../convex/_generated/api');
+      await convexClient().mutation(api.mutations.saveDocumentAnalysis, {
+        session_id: typeof body.session_id === 'string' ? body.session_id : 'guest',
+        timestamp: Date.now(),
+        document_type: safe.document_type,
+        clearconsent_score: safe.clearconsent_score,
+        risk_flags: safe.risk_flags,
+        extracted_figures: safe.extracted_figures,
+        summary: safe.summary,
+        language,
+        document_hash: text.slice(0, 100),
+      });
+    } catch {
+      // Non-blocking — never fail the main response if Convex save fails
+    }
+
     return NextResponse.json(safe, {
+
       headers: { 'X-Response-Time': `${Date.now() - startTime}ms` },
     });
   } catch (err) {

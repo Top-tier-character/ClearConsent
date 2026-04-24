@@ -116,3 +116,35 @@ export const getProfileStats = query({
     return { documents_analyzed, consents_confirmed, average_risk_score, member_since };
   },
 });
+
+/** Return all document analyses for a session, newest first */
+export const getDocumentAnalyses = query({
+  args: { session_id: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("document_analyses")
+      .withIndex("by_session_id", (q) => q.eq("session_id", args.session_id))
+      .order("desc")
+      .collect();
+  },
+});
+
+/**
+ * Return previous analyses of the same document_type for this session.
+ * Used to surface "You analyzed a similar loan 3 months ago with a better score" alerts.
+ */
+export const getSimilarDocuments = query({
+  args: {
+    session_id: v.string(),
+    document_type: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("document_analyses")
+      .withIndex("by_session_and_type", (q) =>
+        q.eq("session_id", args.session_id).eq("document_type", args.document_type)
+      )
+      .order("desc")
+      .collect();
+  },
+});
