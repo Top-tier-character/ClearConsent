@@ -42,12 +42,14 @@ export async function POST(req: NextRequest) {
         result = parseGroqJson(raw);
         break;
       } catch (e) {
-        lastError = String(e);
+        lastError = e instanceof Error ? e.message : String(e);
+        console.error(`[analyze] Groq attempt ${attempt + 1} failed:`, lastError);
         await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
       }
     }
 
     if (!result) {
+      console.error('[analyze] All 3 Groq attempts failed. Last error:', lastError);
       return NextResponse.json(
         { error: 'Analysis failed after 3 attempts', details: lastError },
         { status: 500, headers: { 'X-Response-Time': `${Date.now() - startTime}ms` } }

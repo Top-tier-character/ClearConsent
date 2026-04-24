@@ -118,7 +118,7 @@ export default function AnalyzePage() {
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || errData.details || `Analysis failed (${response.status})`);
+        throw new Error(errData.details || errData.error || `Analysis failed (${response.status})`);
       }
       const data = await response.json();
 

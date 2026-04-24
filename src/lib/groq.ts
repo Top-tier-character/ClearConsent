@@ -19,7 +19,8 @@ export default groq;
  *  llama-3.3-70b-versatile is Groq's current 70B model — reliable language and JSON instruction following.
  *  Used for document analysis where accuracy is critical.
  */
-export const GROQ_MODEL = 'llama3-70b-8192';
+export const GROQ_MODEL = 'llama-3.3-70b-versatile';
+// Note: llama3-70b-8192 was deprecated by Groq in late 2024. Use llama-3.3-70b-versatile.
 
 /** Fast model for low-stakes Groq calls (narrative text, tips).
  *  ~5x faster than the 70B model. Use for simulate/confirm routes.
