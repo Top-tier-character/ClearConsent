@@ -9,19 +9,8 @@ import type { NextAuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
-import { ConvexHttpClient } from 'convex/browser';
+import { getConvexClient } from '@/lib/convex';
 import { api } from '../../convex/_generated/api';
-
-/**
- * Lazily initialize the Convex client inside request handlers only.
- * Prevents a module-level crash if NEXT_PUBLIC_CONVEX_URL is undefined
- * at import time (e.g. during static analysis or misconfigured deploys).
- */
-function getConvexClient(): ConvexHttpClient {
-  const url = process.env.NEXT_PUBLIC_CONVEX_URL;
-  if (!url) throw new Error('NEXT_PUBLIC_CONVEX_URL is not configured.');
-  return new ConvexHttpClient(url);
-}
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -41,7 +30,6 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Email and password are required.');
         }
 
-        // Client is created here — inside the request, never at module level
         const client = getConvexClient();
 
         const user = await client.query(api.queries.getUserByEmail, {
@@ -71,6 +59,41 @@ export const authOptions: NextAuthOptions = {
   ],
 
   callbacks: {
+    /**
+     * Sync Google OAuth users into Convex on first sign-in.
+     * Without this, Google-authed users have no Convex record,
+     * causing downstream failures in history/profile queries.
+     */
+    async signIn({ user, account }) {
+      if (account?.provider === 'google') {
+        try {
+          const client = getConvexClient();
+          const existing = await client.query(api.queries.getUserByEmail, {
+            email: user.email!,
+          });
+          if (!existing) {
+            await client.mutation(api.mutations.createUser as any, {
+              email: user.email!,
+              name: user.name ?? 'Google User',
+              password_hash: '',
+              google_id: user.id,
+              auth_provider: 'google',
+              language_preference: 'en',
+            });
+          } else if (!existing.google_id) {
+            await client.mutation(api.mutations.updateUser as any, {
+              email: user.email!,
+              google_id: user.id,
+            });
+          }
+        } catch (err) {
+          console.error('[authOptions] Failed to sync Google user to Convex:', err);
+          // Do not block login — Convex sync failure is non-fatal
+        }
+      }
+      return true;
+    },
+
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;

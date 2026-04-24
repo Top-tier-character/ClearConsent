@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { convex } from '@/lib/convex';
+import { convexClient } from '@/lib/convex';
 import { api } from '../../../../../convex/_generated/api';
 
 /**
@@ -22,8 +22,8 @@ export async function GET(req: NextRequest) {
 
     // ── Query Convex for consent records and risk logs ─────────────────────
     const [consentRecords, riskLogs] = await Promise.all([
-      convex.query(api.queries.getSessionHistory, { session_id }),
-      convex.query(api.queries.getRiskLogsForSession, { session_id }),
+      convexClient().query(api.queries.getSessionHistory, { session_id }),
+      convexClient().query(api.queries.getRiskLogsForSession, { session_id }),
     ]);
 
     // ── Compute stats ──────────────────────────────────────────────────────

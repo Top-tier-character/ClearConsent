@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import { convex } from '@/lib/convex';
+import { convexClient } from '@/lib/convex';
 import { api } from '../../../../../convex/_generated/api';
 
 export async function POST(req: NextRequest) {
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Look up user in Convex
-    const user = await convex.query(api.queries.getUserByEmail, { email });
+    const user = await convexClient().query(api.queries.getUserByEmail, { email });
 
     if (!user) {
       return NextResponse.json(

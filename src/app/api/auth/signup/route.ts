@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import { ConvexHttpClient } from 'convex/browser';
+import { convexClient } from '@/lib/convex';
 import { api } from '../../../../../convex/_generated/api';
-
-const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,7 +28,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Check duplicate email ────────────────────────────────────────────────
-    const existing = await convexClient.query(api.queries.getUserByEmail, { email });
+    const existing = await convexClient().query(api.queries.getUserByEmail, { email });
     if (existing) {
       return NextResponse.json(
         { error: 'An account with this email already exists.' },
@@ -40,10 +38,12 @@ export async function POST(req: NextRequest) {
 
     // ── Hash password & create user ──────────────────────────────────────────
     const password_hash = await bcrypt.hash(password, 12);
-    await convexClient.mutation(api.mutations.createUser as any, {
+    await convexClient().mutation(api.mutations.createUser as any, {
       email,
       name,
       password_hash,
+      auth_provider: 'credentials',
+      language_preference: 'en',
     });
 
     return NextResponse.json(

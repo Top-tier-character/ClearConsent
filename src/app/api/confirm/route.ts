@@ -3,7 +3,7 @@ import groq, { GROQ_MODEL } from '@/lib/groq';
 import { parseGroqJson } from '@/lib/parseGroq';
 import { buildConsentSummaryPrompt } from '@/lib/prompts';
 import type { Language } from '@/lib/store';
-import { convex } from '@/lib/convex';
+import { convexClient } from '@/lib/convex';
 import { api } from '../../../../convex/_generated/api';
 
 interface QuizAnswerItem {
@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
 
     // ── 7. Persist consent record ──────────────────────────────────────────
     const now = Date.now();
-    await convex.mutation(api.mutations.saveConsentRecord, {
+    await convexClient().mutation(api.mutations.saveConsentRecord, {
       consent_id,
       session_id: body.session_id as string,
       timestamp: now,
@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
       status: 'approved',
     });
 
-    await convex.mutation(api.mutations.updateRiskLogConsent, {
+    await convexClient().mutation(api.mutations.updateRiskLogConsent, {
       session_id: body.session_id as string,
       timestamp: now,
     });

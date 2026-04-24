@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { convex } from '@/lib/convex';
+import { convexClient } from '@/lib/convex';
 import { api } from '../../../../convex/_generated/api';
 
 /**
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const records = await convex.query(api.queries.getSessionHistory, { session_id });
+    const records = await convexClient().query(api.queries.getSessionHistory, { session_id });
 
     return NextResponse.json(
       { session_id, records },
