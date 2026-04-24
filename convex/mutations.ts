@@ -161,6 +161,11 @@ export const createUser = mutation({
     email: v.string(),
     name: v.string(),
     password_hash: v.string(),
+    google_id: v.optional(v.string()),
+    auth_provider: v.string(),
+    language_preference: v.optional(v.string()),
+    simplified_mode: v.optional(v.boolean()),
+    dark_mode: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -172,22 +177,31 @@ export const createUser = mutation({
       throw new Error("An account with this email already exists.");
     }
 
+    const now = Date.now();
     return await ctx.db.insert("users", {
       email: args.email,
       name: args.name,
       password_hash: args.password_hash,
-      created_at: Date.now(),
+      google_id: args.google_id,
+      auth_provider: args.auth_provider,
+      language_preference: args.language_preference ?? "en",
+      simplified_mode: args.simplified_mode ?? false,
+      dark_mode: args.dark_mode ?? false,
+      created_at: now,
+      last_login: now,
     });
   },
 });
 
-/** Update user name and/or email */
+/** Update user profile fields */
 export const updateUser = mutation({
   args: {
-    email: v.string(),           // lookup key (current email)
-    new_name: v.optional(v.string()),
-    new_email: v.optional(v.string()),
-    new_password_hash: v.optional(v.string()),
+    email: v.string(),                          // lookup key
+    name: v.optional(v.string()),
+    language_preference: v.optional(v.string()),
+    simplified_mode: v.optional(v.boolean()),
+    dark_mode: v.optional(v.boolean()),
+    google_id: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await ctx.db
@@ -197,13 +211,94 @@ export const updateUser = mutation({
 
     if (!user) throw new Error("User not found.");
 
-    const patch: Record<string, string> = {};
-    if (args.new_name) patch.name = args.new_name;
-    if (args.new_email) patch.email = args.new_email;
-    if (args.new_password_hash) patch.password_hash = args.new_password_hash;
+    const patch: Record<string, unknown> = { last_login: Date.now() };
+    if (args.name !== undefined) patch.name = args.name;
+    if (args.language_preference !== undefined) patch.language_preference = args.language_preference;
+    if (args.simplified_mode !== undefined) patch.simplified_mode = args.simplified_mode;
+    if (args.dark_mode !== undefined) patch.dark_mode = args.dark_mode;
+    if (args.google_id !== undefined) patch.google_id = args.google_id;
 
     await ctx.db.patch(user._id, patch);
-    return true;
+    return await ctx.db.get(user._id);
+  },
+});
+
+/** Update a user's password hash */
+export const updatePassword = mutation({
+  args: {
+    email: v.string(),
+    new_password_hash: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .first();
+
+    if (!user) throw new Error("User not found.");
+
+    await ctx.db.patch(user._id, { password_hash: args.new_password_hash });
+    return { success: true };
+  },
+});
+
+/**
+ * Delete a user and all their associated data.
+ * Pass session_id to also remove consent_records, quiz_results,
+ * risk_logs, and chat_messages linked to that session.
+ */
+export const deleteUser = mutation({
+  args: {
+    email: v.string(),
+    session_id: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .first();
+
+    if (!user) throw new Error("User not found.");
+
+    // Delete the user record
+    await ctx.db.delete(user._id);
+
+    // If a session_id is provided, cascade-delete associated records
+    if (args.session_id) {
+      const sid = args.session_id;
+
+      const consents = await ctx.db
+        .query("consent_records")
+        .withIndex("by_session_id", (q) => q.eq("session_id", sid))
+        .collect();
+      await Promise.all(consents.map((r) => ctx.db.delete(r._id)));
+
+      const riskLogs = await ctx.db
+        .query("risk_logs")
+        .withIndex("by_session_id", (q) => q.eq("session_id", sid))
+        .collect();
+      await Promise.all(riskLogs.map((r) => ctx.db.delete(r._id)));
+
+      const chats = await ctx.db
+        .query("chat_messages")
+        .withIndex("by_session_id", (q) => q.eq("session_id", sid))
+        .collect();
+      await Promise.all(chats.map((r) => ctx.db.delete(r._id)));
+
+      // quiz_results don't have a session index, delete via consent_ids
+      const consentIds = consents.map((c) => c.consent_id);
+      await Promise.all(
+        consentIds.map(async (cid) => {
+          const quizzes = await ctx.db
+            .query("quiz_results")
+            .withIndex("by_consent_id", (q) => q.eq("consent_id", cid))
+            .collect();
+          return Promise.all(quizzes.map((q) => ctx.db.delete(q._id)));
+        })
+      );
+    }
+
+    return { success: true };
   },
 });
 
@@ -211,10 +306,13 @@ export const updateUser = mutation({
 export const saveChatMessage = mutation({
   args: {
     session_id: v.string(),
-    timestamp: v.number(),
+    user_id: v.optional(v.string()),
     role: v.string(),
     content: v.string(),
-    language: v.optional(v.string()),
+    timestamp: v.number(),
+    page_context: v.optional(v.string()),
+    has_prefill: v.optional(v.boolean()),
+    prefill_data: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("chat_messages", args);

@@ -64,16 +64,27 @@ export default defineSchema({
   users: defineTable({
     email: v.string(),
     name: v.string(),
-    password_hash: v.string(),
+    password_hash: v.string(),           // empty string for Google OAuth users
+    google_id: v.optional(v.string()),
+    auth_provider: v.optional(v.string()),  // "credentials" | "google"
+    language_preference: v.optional(v.string()), // default "en"
+    simplified_mode: v.optional(v.boolean()),    // default false
+    dark_mode: v.optional(v.boolean()),          // default false
     created_at: v.number(),
-  }).index("by_email", ["email"]),
+    last_login: v.optional(v.number()),
+  })
+    .index("by_email", ["email"])
+    .index("by_google_id", ["google_id"]),
 
   // Chat message history for AI assistant
   chat_messages: defineTable({
     session_id: v.string(),
-    timestamp: v.number(),
-    role: v.string(),        // "user" | "assistant"
+    user_id: v.optional(v.string()),
+    role: v.string(),               // "user" | "assistant"
     content: v.string(),
-    language: v.optional(v.string()),
+    timestamp: v.number(),
+    page_context: v.optional(v.string()),
+    has_prefill: v.optional(v.boolean()),
+    prefill_data: v.optional(v.any()),
   }).index("by_session_id", ["session_id"]),
 });
