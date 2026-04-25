@@ -66,7 +66,11 @@ export function AiAssistant() {
         }),
       });
 
-      if (!response.ok) throw new Error('API failed');
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        console.error('Assistant API failed:', response.status, errData);
+        throw new Error(errData.details || errData.error || 'API failed');
+      }
       const data = await response.json();
 
       addChatMessage({ role: 'assistant', content: data.reply });

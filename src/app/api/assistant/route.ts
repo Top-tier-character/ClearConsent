@@ -5,8 +5,6 @@ import groq, { GROQ_MODEL } from '@/lib/groq';
 import { parseGroqJson } from '@/lib/parseGroq';
 import { buildAssistantSystemPrompt } from '@/lib/prompts';
 import type { Language } from '@/lib/store';
-import { convexClient } from '@/lib/convex';
-import { api } from '../../../../convex/_generated/api';
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -96,19 +94,26 @@ export async function POST(req: NextRequest) {
 
     // ── 6. Persist both turns to Convex ───────────────────────────────────
     if (session_id) {
-      const now = Date.now();
-      await convexClient().mutation(api.mutations.saveChatMessage as any, {
-        session_id: String(session_id),
-        timestamp: now,
-        role: 'user',
-        content: message.trim(),
-      });
-      await convexClient().mutation(api.mutations.saveChatMessage as any, {
-        session_id: String(session_id),
-        timestamp: now + 1,
-        role: 'assistant',
-        content: reply,
-      });
+      try {
+        const { convexClient } = await import('@/lib/convex');
+        const { api } = await import('../../../../convex/_generated/api');
+        const now = Date.now();
+        await convexClient().mutation(api.mutations.saveChatMessage as any, {
+          session_id: String(session_id),
+          timestamp: now,
+          role: 'user',
+          content: message.trim(),
+        });
+        await convexClient().mutation(api.mutations.saveChatMessage as any, {
+          session_id: String(session_id),
+          timestamp: now + 1,
+          role: 'assistant',
+          content: reply,
+        });
+      } catch (convexErr) {
+        console.error('[assistant] Convex save failed:', convexErr);
+        // Do not fail the request if Convex persistence fails
+      }
     }
 
     // ── 7. Return ──────────────────────────────────────────────────────────
