@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { useAppStore } from '@/lib/store';
+import { useAppStore, globalAssistantRef } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -177,10 +177,7 @@ export default function AnalyzePage() {
     toast('Email copied to clipboard!');
   };
 
-  const handleAskAi = (actionText: string) => {
-    addChatMessage({ role: 'user', content: `Can you explain more about this: "${actionText}"?` });
-    setAiAssistantOpen(true);
-  };
+
 
   // Safe parsed numbers for Numbers tab
   const loanAmount = currentAnalysis?.extractedFigures?.loan_amount || 0;
@@ -203,56 +200,34 @@ export default function AnalyzePage() {
 
         <div className="bg-[#FAF9F6] dark:bg-card rounded-3xl p-8 border-4 border-dashed border-[#1B2A4A]/20 dark:border-border min-h-[320px] flex flex-col items-center justify-center gap-8 transition-colors">
           
-          <div className="flex flex-wrap justify-center gap-4">
-            <Button variant={uploadMode === 'file' ? 'default' : 'outline'} className={cn("h-14 px-6 text-lg rounded-xl", uploadMode === 'file' && "bg-[#1B2A4A] text-white hover:bg-[#1B2A4A]/90")} onClick={() => setUploadMode('file')}>
-              📂 Upload PDF/TXT
-            </Button>
-            <Button variant={uploadMode === 'paste' ? 'default' : 'outline'} className={cn("h-14 px-6 text-lg rounded-xl", uploadMode === 'paste' && "bg-[#1B2A4A] text-white hover:bg-[#1B2A4A]/90")} onClick={() => setUploadMode('paste')}>
-              📋 Paste Text
-            </Button>
-            <Button variant={uploadMode === 'camera' ? 'default' : 'outline'} className={cn("md:hidden h-14 px-6 text-lg rounded-xl", uploadMode === 'camera' && "bg-[#1B2A4A] text-white hover:bg-[#1B2A4A]/90")} onClick={() => setUploadMode('camera')}>
-              📷 Scan
-            </Button>
-          </div>
-
-          <div className="w-full max-w-2xl">
-            {uploadMode === 'file' && (
-              <div className="flex flex-col items-center">
-                <input ref={fileInputRef} type="file" accept=".txt,.pdf" className="hidden" onChange={handleFileUpload} />
-                <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="h-20 w-full border-2 border-dashed text-lg font-semibold bg-white dark:bg-black">
-                  <UploadCloud className="mr-3 h-6 w-6" /> Select File from Device
-                </Button>
-                {text && <p className="mt-3 text-success font-bold flex items-center"><CheckCircle2 className="mr-2 h-5 w-5"/> File loaded and ready!</p>}
-                {pdfPreviewUrl && (
-                  <div className="w-full mt-4 rounded-xl border border-border overflow-hidden shadow-sm">
-                    <div className="flex items-center justify-between px-4 py-2 bg-muted/30 border-b border-border">
-                      <span className="text-sm font-semibold text-muted-foreground">📄 {fileName}</span>
-                      <button onClick={() => { URL.revokeObjectURL(pdfPreviewUrl); setPdfPreviewUrl(null); }} className="text-muted-foreground hover:text-red-500 p-1">
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <iframe src={pdfPreviewUrl} className="w-full" style={{ height: '400px', border: 'none' }} title="PDF Preview" />
-                  </div>
-                )}
+          <div className="w-full max-w-2xl flex flex-col gap-6">
+            <div className="flex flex-col items-center w-full">
+              <input ref={fileInputRef} type="file" accept=".txt,.pdf" className="hidden" onChange={handleFileUpload} />
+              <Button onClick={() => fileInputRef.current?.click()} className="h-16 w-full text-lg font-bold rounded-xl shadow-md bg-[#1B2A4A] hover:bg-[#1B2A4A]/90 text-white transition-all">
+                <UploadCloud className="mr-3 h-6 w-6" /> Select File from Device
+              </Button>
+              {fileName && <p className="mt-3 text-success font-bold flex items-center"><CheckCircle2 className="mr-2 h-5 w-5"/> {fileName} loaded!</p>}
+              
+              <div className="flex items-center w-full my-6">
+                <div className="flex-1 border-b border-border"></div>
+                <span className="px-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">OR PASTE TEXT</span>
+                <div className="flex-1 border-b border-border"></div>
               </div>
-            )}
-            {uploadMode === 'paste' && (
+
               <textarea
-                className="w-full h-40 p-4 rounded-xl border-2 border-border focus:border-[#1B2A4A] focus:ring-0 bg-white dark:bg-black text-base"
+                className="w-full h-32 p-4 rounded-xl border-2 border-border focus:border-[#1B2A4A] focus:ring-0 bg-white dark:bg-black text-base transition-colors"
                 placeholder="Paste the contents of your document here..."
                 value={text}
                 onChange={(e) => setText(e.target.value)}
               />
-            )}
-            {uploadMode === 'camera' && (
-              <div className="flex flex-col items-center">
+
+              <div className="flex w-full justify-center mt-6 md:hidden">
                 <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileUpload} />
-                <Button onClick={() => cameraInputRef.current?.click()} variant="outline" className="h-20 w-full border-2 border-dashed text-lg font-semibold bg-white dark:bg-black">
-                  <Camera className="mr-3 h-6 w-6" /> Open Camera to Scan
+                <Button onClick={() => cameraInputRef.current?.click()} variant="outline" className="h-14 w-full border-2 border-dashed font-semibold bg-white dark:bg-black rounded-xl">
+                  <Camera className="mr-2 h-5 w-5" /> Open Camera to Scan
                 </Button>
-                {text && <p className="mt-3 text-success font-bold flex items-center"><CheckCircle2 className="mr-2 h-5 w-5"/> Image scanned!</p>}
               </div>
-            )}
+            </div>
           </div>
 
           <div className="w-full max-w-2xl border-t border-border/50 pt-8 mt-4">
@@ -326,24 +301,31 @@ export default function AnalyzePage() {
 
         <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
           <div className="max-w-2xl mx-auto space-y-4 pb-20">
-            {paragraphs.map((p, idx) => {
-              // Basic logic: if simplified is on and we have simple text mapped, show it. Otherwise show raw.
-              // Since the API didn't return simplified paragraphs, we just render the raw text. The user could enhance this later.
-              const isSelected = selectedParagraphIndex === idx;
-              return (
-                <p 
-                  key={idx}
-                  data-index={idx}
-                  onClick={() => handleParagraphClick(idx, p)}
-                  className={cn(
-                    "p-3 rounded-lg text-[15px] leading-relaxed cursor-pointer transition-colors border",
-                    isSelected ? "bg-[#1B2A4A]/10 border-[#1B2A4A] dark:bg-[#1B2A4A]/40 dark:border-white shadow-sm" : "bg-white dark:bg-black border-transparent hover:bg-[#1B2A4A]/5 hover:border-border"
-                  )}
-                >
-                  {p}
-                </p>
-              );
-            })}
+            {pdfPreviewUrl ? (
+              <iframe
+                src={pdfPreviewUrl}
+                className="w-full h-full rounded-lg"
+                style={{ minHeight: '600px', border: 'none' }}
+                title="Document Preview"
+              />
+            ) : paragraphs.length > 0 ? (
+              paragraphs.map((p, idx) => {
+                const isSelected = selectedParagraphIndex === idx;
+                return (
+                  <p 
+                    key={idx}
+                    data-index={idx}
+                    onClick={() => handleParagraphClick(idx, p)}
+                    className={cn(
+                      "p-3 rounded-lg text-[15px] leading-relaxed cursor-pointer transition-colors border",
+                      isSelected ? "bg-[#1B2A4A]/10 border-[#1B2A4A] dark:bg-[#1B2A4A]/40 dark:border-white shadow-sm" : "bg-white dark:bg-black border-transparent hover:bg-[#1B2A4A]/5 hover:border-border"
+                    )}
+                  >
+                    {p}
+                  </p>
+                );
+              })
+            ) : null}
           </div>
         </div>
       </div>
@@ -482,7 +464,12 @@ export default function AnalyzePage() {
                           <Button 
                             variant="outline" 
                             className="flex-1 border-[#1B2A4A] text-[#1B2A4A] dark:border-white dark:text-white font-bold h-12 rounded-xl"
-                            onClick={() => handleAskAi(action.riskTitle)}
+                            onClick={() => {
+                              setAiAssistantOpen(true);
+                              setTimeout(() => {
+                                globalAssistantRef.current?.sendMessage(`Explain this clause: "${action.riskTitle}". What does it mean?`);
+                              }, 300);
+                            }}
                           >
                             <HelpCircle className="mr-2 h-4 w-4" /> Ask AI About This
                           </Button>
