@@ -56,6 +56,8 @@ export default function AnalyzePage() {
   const [selectedParagraphIndex, setSelectedParagraphIndex] = useState<number | null>(null);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const extractedTextRef = useRef<string>('');
 
   const [incomeOverride, setIncomeOverride] = useState<number>(0);
   const [incomeDrop, setIncomeDrop] = useState(false);
@@ -82,19 +84,17 @@ export default function AnalyzePage() {
         setText(content);
       } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
         setFileName(file.name);
-        // Inline preview — no API call needed
-        if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
-        const blob = new Blob([await file.arrayBuffer()], { type: 'application/pdf' });
-        setPdfPreviewUrl(URL.createObjectURL(blob));
+        setUploadedFile(file);
+        
         // Extract text
         const formData = new FormData();
         formData.append('file', file);
         const res = await fetch('/api/extract-pdf', { method: 'POST', body: formData });
         const data = await res.json();
         if (data.text) {
-          setText(data.text);
+          extractedTextRef.current = data.text;
         } else {
-          setError(data.error || 'Could not extract text. Try Paste Text instead.');
+          setError(data.error || 'Could not extract text.');
         }
       }
     } catch {
@@ -103,7 +103,8 @@ export default function AnalyzePage() {
   };
 
   const runAnalysis = async () => {
-    if (!text.trim()) {
+    const textToAnalyze = extractedTextRef.current || text;
+    if (!textToAnalyze.trim()) {
       setError('Please provide document text.');
       return;
     }
@@ -114,7 +115,7 @@ export default function AnalyzePage() {
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, language, simplified: simplifiedMode }),
+        body: JSON.stringify({ text: textToAnalyze, language, simplified: simplifiedMode }),
       });
 
       if (!response.ok) {
@@ -123,7 +124,7 @@ export default function AnalyzePage() {
       }
       const data = await response.json();
 
-      const paras = text.split('\n\n').map(p => p.trim()).filter(p => p.length > 0);
+      const paras = textToAnalyze.split('\n\n').map(p => p.trim()).filter(p => p.length > 0);
 
       const result: CurrentAnalysis = {
         id: `CLR-${Date.now()}`,
@@ -159,8 +160,11 @@ export default function AnalyzePage() {
   const resetAnalysis = () => {
     setPhase('upload');
     setText('');
+    extractedTextRef.current = '';
+    setUploadedFile(null);
     setCurrentAnalysis(null);
     setSelectedParagraphIndex(null);
+    setFileName(null);
   };
 
   const handleParagraphClick = (idx: number, pText: string) => {
@@ -208,25 +212,19 @@ export default function AnalyzePage() {
               </Button>
               {fileName && <p className="mt-3 text-success font-bold flex items-center"><CheckCircle2 className="mr-2 h-5 w-5"/> {fileName} loaded!</p>}
               
-              <div className="flex items-center w-full my-6">
-                <div className="flex-1 border-b border-border"></div>
-                <span className="px-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">OR PASTE TEXT</span>
-                <div className="flex-1 border-b border-border"></div>
-              </div>
-
-              <textarea
-                className="w-full h-32 p-4 rounded-xl border-2 border-border focus:border-[#1B2A4A] focus:ring-0 bg-white dark:bg-black text-base transition-colors"
-                placeholder="Paste the contents of your document here..."
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-              />
-
-              <div className="flex w-full justify-center mt-6 md:hidden">
-                <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileUpload} />
-                <Button onClick={() => cameraInputRef.current?.click()} variant="outline" className="h-14 w-full border-2 border-dashed font-semibold bg-white dark:bg-black rounded-xl">
-                  <Camera className="mr-2 h-5 w-5" /> Open Camera to Scan
-                </Button>
-              </div>
+              {uploadedFile && (
+                <iframe
+                  src={URL.createObjectURL(uploadedFile)}
+                  style={{
+                    width: '100%',
+                    height: '500px',
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '12px',
+                    marginTop: '16px',
+                  }}
+                  title="PDF Preview"
+                />
+              )}
             </div>
           </div>
 
@@ -260,7 +258,7 @@ export default function AnalyzePage() {
              <Button 
                className="flex-1 h-14 bg-[#1B2A4A] hover:bg-[#1B2A4A]/90 text-white text-lg font-bold rounded-xl"
                onClick={runAnalysis}
-               disabled={isLoading || !text}
+               disabled={isLoading || (!text && !extractedTextRef.current)}
              >
                {isLoading ? <Loader2 className="animate-spin h-6 w-6" /> : "Analyze Document →"}
              </Button>
