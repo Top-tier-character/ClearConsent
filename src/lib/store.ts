@@ -1,4 +1,7 @@
+import { createRef } from 'react';
 import { create } from 'zustand';
+
+export const globalAssistantRef = createRef<{ sendMessage: (text: string) => void }>();
 import { persist } from 'zustand/middleware';
 
 export type Language = 'en' | 'hi' | 'mr';
@@ -120,7 +123,7 @@ export const useAppStore = create<AppState>()(
         simulationPrefill: state.simulationPrefill,
         user: state.user,
         simplifiedMode: state.simplifiedMode,
-        chatHistory: state.chatHistory,
+        // chatHistory is intentionally excluded — resets every session
         // language is intentionally excluded — always starts as 'en'
       }),
     }

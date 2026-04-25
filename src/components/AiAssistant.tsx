@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
+import { useSession } from 'next-auth/react';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { MessageSquare, X, Send, Bot, User, Loader2, Minimize2, Copy } from 'lucide-react';
@@ -10,11 +11,24 @@ import { cn } from '@/lib/utils';
 import type { ChatMessage } from '@/lib/store';
 import { toast } from 'sonner';
 
-export function AiAssistant() {
+export const AiAssistant = forwardRef((props, ref) => {
+  const { data: session } = useSession();
   const { chatHistory, addChatMessage, clearChatHistory, currentAnalysis, currentSimulation, language, isAiAssistantOpen: isOpen, setAiAssistantOpen: setIsOpen } = useAppStore();
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (session?.user) {
+      clearChatHistory();
+    }
+  }, [session?.user?.email]);
+
+  useImperativeHandle(ref, () => ({
+    sendMessage: (text: string) => {
+      handleSendDirect(text);
+    }
+  }));
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -39,8 +53,13 @@ export function AiAssistant() {
 
   const handleSend = async () => {
     if (!inputText.trim()) return;
+    await handleSendDirect(inputText);
+  };
 
-    const userMsg: ChatMessage = { role: 'user', content: inputText };
+  const handleSendDirect = async (textToSend: string) => {
+    if (!textToSend.trim()) return;
+
+    const userMsg: ChatMessage = { role: 'user', content: textToSend };
     addChatMessage(userMsg);
     setInputText('');
     setIsLoading(true);
@@ -52,7 +71,7 @@ export function AiAssistant() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: inputText.trim(),
+          message: textToSend.trim(),
           chat_history: chatHistory,
           context: {
             currentAnalysis: currentAnalysis ?? null,
@@ -206,4 +225,4 @@ export function AiAssistant() {
       </div>
     </>
   );
-}
+});

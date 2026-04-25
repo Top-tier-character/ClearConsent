@@ -85,6 +85,7 @@ RULES:
 - pros, cons, hidden_clauses must each have 3-5 items
 - specific_clauses must have 2-4 items with severity "high", "medium", or "low"
 - action_plan must have 1-3 items corresponding to the highest risks found
+- RISK SCORE CALCULATION: START at 100, then DEDUCT: Interest >15% (-20), Interest >24% (-15 additional), Prepayment penalty (-15), Late penalty >₹500 (-10), Auto-deduction (-20), Floating interest (-15), Processing fee >1% (-10), Arbitration-only (-15), Auto-renewal (-10). Score cannot go below 0. A score <40 is predatory. (For a loan with 18% rate, ₹800 penalty, and auto-deduction, score should be ~35).
 - Return ONLY the JSON object. No markdown. No backticks. No explanation.`;
 }
 
