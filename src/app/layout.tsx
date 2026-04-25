@@ -5,6 +5,7 @@ import { Navbar } from '@/components/Navbar';
 import { AiAssistant } from '@/components/AiAssistant';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { globalAssistantRef } from '@/lib/store';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { ConvexClientProvider } from './ConvexClientProvider';
 import { AuthProvider } from '@/components/AuthProvider';
@@ -44,7 +45,7 @@ export default function RootLayout({
                   <main className="flex-1">
                     {children}
                   </main>
-                  <AiAssistant />
+                  <AiAssistant ref={globalAssistantRef} />
                 </div>
                 <Toaster position="top-center" />
               </TooltipProvider>
