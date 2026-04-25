@@ -1,6 +1,6 @@
 # ROADMAP.md
 
-> **Current Phase**: Phase 4 — History, Profile & Polish
+> **Current Phase**: Phase 5 — Production Hardening
 > **Milestone**: v1.0 Production-Ready
 
 ## Must-Haves (from SPEC)
@@ -47,7 +47,7 @@
 ---
 
 ### Phase 4: History, Profile & Polish
-**Status**: ⬜ Not Started
+**Status**: ✅ Complete
 **Objective**: Complete history page, profile stats, document comparison, simulate page
 **Key Tasks**:
 - History page: fetch from Convex, display with risk scores
@@ -59,7 +59,7 @@
 ---
 
 ### Phase 5: Production Hardening
-**Status**: ⬜ Not Started
+**Status**: 🏃 In Progress
 **Objective**: Rate limiting, input validation, error monitoring, tests
 **Key Tasks**:
 - API rate limiting (protect Groq and Vision API costs)
