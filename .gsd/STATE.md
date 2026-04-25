@@ -4,21 +4,18 @@
 
 ## Current Position
 
-**Phase**: 3 — Bug Fixes & Feature Completion
-**Task**: Not yet started — waiting for /plan 3
-**Last Action**: /map + /new-project initialization complete
+**Phase**: 4 — History, Profile & Polish
+**Task**: Not yet started — waiting for /plan 4
+**Last Action**: /execute 3 and /verify 3 completed
 
 ## Project Summary
 
 ClearConsent is a brownfield Next.js 14 App Router project — substantial working code exists.
-Phases 1 and 2 are complete. The codebase has a full analyze pipeline, Convex DB, and NextAuth.
+Phases 1, 2, and 3 are complete. The codebase has a full analyze pipeline, Convex DB, NextAuth, and the core UI bugs have been addressed.
 
 ## Known Blockers
 
-1. **Dummy EMI calc** — `analyze/page.tsx:181` uses `loanAmount * 1.1 / 12` instead of the real formula from `src/lib/finance.ts`
-2. **Disconnected UI** — "Ask AI About This" button in Action Plan tab has no onClick handler
-3. **NEXTAUTH_URL hardcoded to production** — `.env.local` has `NEXTAUTH_URL=https://clearconsent-one.vercel.app` which breaks local Google OAuth callback
-4. **package.json name** — Set to `"temp"` instead of `"clearconsent"`
+*(None currently. All previous blockers from Phase 3 were resolved.)*
 
 ## Key Architecture Decisions
 
@@ -30,12 +27,10 @@ Phases 1 and 2 are complete. The codebase has a full analyze pipeline, Convex DB
 
 ## Context Dump
 
-### Files Most Likely to Need Changes in Phase 3
-- `src/app/analyze/page.tsx` — Fix EMI calc + wire AI button
-- `src/lib/finance.ts` — Source of truth for EMI formula
-- `src/components/AiAssistant.tsx` — Needs to accept external trigger
-- `.env.local` — NEXTAUTH_URL needs conditional handling
-- `package.json` — name field
+### Files Most Likely to Need Changes in Phase 4
+- `src/app/history/page.tsx` — Load history from Convex
+- `src/app/profile/page.tsx` — Add user settings
+- `src/app/simulate/page.tsx` — Build EMI simulation page
 
 ### Convex Pattern
 ```ts
@@ -55,6 +50,5 @@ const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 ## Next Steps (Recommended)
 
-1. `/plan 3` — Create detailed execution plan for Phase 3 bug fixes
-2. `/execute 3` — Fix EMI calc, wire AI button, fix NEXTAUTH_URL, fix package name
-3. `/verify 3` — Run build, check analyze flow end-to-end
+1. `/plan 4` — Create detailed execution plan for Phase 4
+2. `/execute 4` — Implement History, Profile, and Simulate pages

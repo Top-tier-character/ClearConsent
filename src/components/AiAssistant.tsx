@@ -11,8 +11,7 @@ import type { ChatMessage } from '@/lib/store';
 import { toast } from 'sonner';
 
 export function AiAssistant() {
-  const { chatHistory, addChatMessage, clearChatHistory, currentAnalysis, currentSimulation, language } = useAppStore();
-  const [isOpen, setIsOpen] = useState(false);
+  const { chatHistory, addChatMessage, clearChatHistory, currentAnalysis, currentSimulation, language, isAiAssistantOpen: isOpen, setAiAssistantOpen: setIsOpen } = useAppStore();
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);

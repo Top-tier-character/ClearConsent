@@ -5,6 +5,7 @@ import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
+import { calculateEMI } from '@/lib/finance';
 
 import {
   FileText, CheckCircle, AlertTriangle, UploadCloud,
@@ -42,7 +43,7 @@ function RefreshCwIcon(props: any) {
 }
 
 export default function AnalyzePage() {
-  const { language, setLanguage, simplifiedMode, setSimplifiedMode, currentAnalysis, setCurrentAnalysis, addHistory } = useAppStore();
+  const { language, setLanguage, simplifiedMode, setSimplifiedMode, currentAnalysis, setCurrentAnalysis, addHistory, setAiAssistantOpen, addChatMessage } = useAppStore();
 
   const [phase, setPhase] = useState<'upload' | 'dashboard'>('upload');
   const [activeTab, setActiveTab] = useState<'overview' | 'risks' | 'action' | 'numbers'>('overview');
@@ -176,9 +177,17 @@ export default function AnalyzePage() {
     toast('Email copied to clipboard!');
   };
 
+  const handleAskAi = (actionText: string) => {
+    addChatMessage({ role: 'user', content: `Can you explain more about this: "${actionText}"?` });
+    setAiAssistantOpen(true);
+  };
+
   // Safe parsed numbers for Numbers tab
   const loanAmount = currentAnalysis?.extractedFigures?.loan_amount || 0;
-  const emiCalc = loanAmount > 0 ? (loanAmount * 1.1) / 12 : 0; // Dummy calculation if no real logic
+  const interestRate = currentAnalysis?.extractedFigures?.interest_rate || 0;
+  const tenureMonths = currentAnalysis?.extractedFigures?.tenure_months || 0;
+  
+  const emiCalc = loanAmount > 0 ? calculateEMI(loanAmount, interestRate, tenureMonths) : 0;
   const actualIncome = incomeDrop ? incomeOverride * 0.8 : incomeOverride;
   const ratio = actualIncome > 0 ? (emiCalc / actualIncome) * 100 : 0;
 
@@ -470,7 +479,11 @@ export default function AnalyzePage() {
                           <Button className="flex-1 bg-[#1B2A4A] hover:bg-[#1B2A4A]/90 text-white font-bold h-12 rounded-xl" onClick={() => copyEmail(action.emailTemplate)}>
                             <Copy className="mr-2 h-4 w-4" /> Copy Email to Lender
                           </Button>
-                          <Button variant="outline" className="flex-1 border-[#1B2A4A] text-[#1B2A4A] dark:border-white dark:text-white font-bold h-12 rounded-xl">
+                          <Button 
+                            variant="outline" 
+                            className="flex-1 border-[#1B2A4A] text-[#1B2A4A] dark:border-white dark:text-white font-bold h-12 rounded-xl"
+                            onClick={() => handleAskAi(action.riskTitle)}
+                          >
                             <HelpCircle className="mr-2 h-4 w-4" /> Ask AI About This
                           </Button>
                         </div>

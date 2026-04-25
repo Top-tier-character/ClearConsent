@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
               content: `Analyze the document and return the JSON object now. Respond in ${langName}.`,
             },
           ],
-          temperature: attempt === 0 ? 0.2 : 0.1,
+          temperature: 0.2,
           max_tokens: 2500,
         });
         const raw = completion.choices[0]?.message?.content ?? '';

@@ -1,6 +1,6 @@
 # ROADMAP.md
 
-> **Current Phase**: Phase 3 — Bug Fixes & Feature Completion
+> **Current Phase**: Phase 4 — History, Profile & Polish
 > **Milestone**: v1.0 Production-Ready
 
 ## Must-Haves (from SPEC)
@@ -10,10 +10,10 @@
 - [x] Convex database schema (7 tables)
 - [x] NextAuth with Google OAuth + credentials
 - [x] Document history persistence
-- [ ] Correct EMI formula in analyze page (uses dummy calc currently)
-- [ ] "Ask AI About This" button wired to AI assistant
-- [ ] App builds to Vercel without errors
-- [ ] Local dev OAuth working (`NEXTAUTH_URL` fix)
+- [x] Correct EMI formula in analyze page (uses dummy calc currently)
+- [x] "Ask AI About This" button wired to AI assistant
+- [x] App builds to Vercel without errors
+- [x] Local dev OAuth working (`NEXTAUTH_URL` fix)
 
 ---
 
@@ -34,7 +34,7 @@
 ---
 
 ### Phase 3: Bug Fixes & Feature Completion
-**Status**: 🔵 In Progress
+**Status**: ✅ Complete
 **Objective**: Fix known bugs, wire up disconnected features, ensure build passes
 **Key Tasks**:
 - Fix dummy EMI calculation in analyze/page.tsx (use finance.ts)

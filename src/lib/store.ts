@@ -66,6 +66,9 @@ interface AppState {
   chatHistory: ChatMessage[];
   addChatMessage: (msg: ChatMessage) => void;
   clearChatHistory: () => void;
+
+  isAiAssistantOpen: boolean;
+  setAiAssistantOpen: (open: boolean) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -95,6 +98,9 @@ export const useAppStore = create<AppState>()(
       chatHistory: [],
       addChatMessage: (msg) => set((state) => ({ chatHistory: [...state.chatHistory, msg] })),
       clearChatHistory: () => set({ chatHistory: [] }),
+
+      isAiAssistantOpen: false,
+      setAiAssistantOpen: (open) => set({ isAiAssistantOpen: open }),
     }),
     {
       name: 'clearconsent-storage',

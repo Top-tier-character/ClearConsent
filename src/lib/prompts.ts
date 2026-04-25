@@ -60,7 +60,7 @@ Return ONLY this JSON structure with no other text:
       "severity": "high"
     }
   ],
-  "callout_text": "Extract REAL numbers from document. Example: In total you will pay back Rs 57600 - that is Rs 7600 more than you borrowed. NEVER write Rs X or Rs Y.",
+  "callout_text": "Extract REAL rupee figures from the document text. Use only numbers explicitly stated in the document. Never write ₹X or ₹Y.",
   "risk_score": 65,
   "risk_explanation": "one sentence why this score",
   "summary": "2-3 sentences plain language summary",

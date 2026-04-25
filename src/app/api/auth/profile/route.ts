@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ConvexHttpClient } from 'convex/browser';
+import { convexClient } from '@/lib/convex';
 import { api } from '../../../../../convex/_generated/api';
-
-const convexClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 /**
  * PATCH /api/auth/profile
@@ -29,7 +27,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     // Verify user exists
-    const user = await convexClient.query(api.queries.getUserByEmail, {
+    const user = await convexClient().query(api.queries.getUserByEmail, {
       email: current_email,
     });
 
@@ -38,7 +36,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     // Update in Convex
-    await convexClient.mutation(api.mutations.updateUser as any, {
+    await convexClient().mutation(api.mutations.updateUser as any, {
       email: current_email,
       new_name: name ?? undefined,
       new_email: email ?? undefined,
