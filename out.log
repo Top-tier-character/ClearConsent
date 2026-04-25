@@ -8,3 +8,7 @@
 
  ✓ Starting...
  ✓ Ready in 4.2s
+ ○ Compiling /api/assistant ...
+ ✓ Compiled /api/assistant in 1336ms (163 modules)
+ POST /api/assistant 200 in 2991ms
+ ✓ Compiled in 48ms
