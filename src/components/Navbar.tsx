@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import { useSession } from 'next-auth/react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ShieldCheck, Moon, Sun, User, Menu, X, BarChart3, Clock, FileText, Settings } from 'lucide-react';
+import { ShieldCheck, Moon, Sun, User, Menu, X, BarChart3, Clock, FileText, Settings, Scale } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,7 @@ export function Navbar() {
     { href: '/analyze', label: 'Analyze' },
     { href: '/history', label: 'My Documents' },
     { href: '/simulate', label: 'Simulate' },
+    { href: '/compare', label: 'Compare' },
     ...(session?.user ? [{ href: '/dashboard', label: 'Dashboard' }] : []),
   ];
 
@@ -71,7 +72,16 @@ export function Navbar() {
 
         {/* Right: Language (desktop) + theme + login + hamburger (mobile) */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Language selector removed */}
+          <Select value={language} onValueChange={(val: any) => setLanguage(val)}>
+            <SelectTrigger className="w-[100px] h-[40px] bg-surface dark:bg-card border-border hidden sm:flex">
+              <SelectValue placeholder="Language" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="en">English</SelectItem>
+              <SelectItem value="hi">हिंदी</SelectItem>
+              <SelectItem value="mr">मराठी</SelectItem>
+            </SelectContent>
+          </Select>
 
           {/* Theme toggle */}
           <Button
@@ -159,6 +169,7 @@ export function Navbar() {
                 let Icon = FileText;
                 if (link.href === '/simulate') Icon = BarChart3;
                 else if (link.href === '/history') Icon = Clock;
+                else if (link.href === '/compare') Icon = Scale;
                 else if (link.href === '/') Icon = ShieldCheck;
                 
                 return (
@@ -178,7 +189,20 @@ export function Navbar() {
               })}
             </div>
 
-
+            {/* Language Selector (Mobile) */}
+            <div className="flex flex-col space-y-2 mt-4">
+              <p className="text-[12px] uppercase font-bold text-muted-foreground tracking-wider px-2">Language</p>
+              <Select value={language} onValueChange={(val: any) => setLanguage(val)}>
+                <SelectTrigger className="w-full h-[52px] bg-card border-[2px] border-border rounded-xl font-semibold">
+                  <SelectValue placeholder="Select Language" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="hi">हिंदी</SelectItem>
+                  <SelectItem value="mr">मराठी</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
           </div>
         </div>

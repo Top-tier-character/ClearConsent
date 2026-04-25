@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useAppStore } from '@/lib/store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,7 +14,7 @@ import { useTheme } from 'next-themes';
 export default function ProfilePage() {
   const { data: session } = useSession();
   const { theme, setTheme } = useTheme();
-  const { simplifiedMode, setSimplifiedMode, history } = useAppStore();
+  const { simplifiedMode, setSimplifiedMode, user, history } = useAppStore();
   
   const [name, setName] = useState(session?.user?.name || '');
   const [isUpdating, setIsUpdating] = useState(false);
@@ -24,6 +24,16 @@ export default function ProfilePage() {
   const [newPassword, setNewPassword] = useState('');
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [pwdMessage, setPwdMessage] = useState('');
+
+  const [stats, setStats] = useState<{ documents_analyzed: number, member_since: number, average_risk_score: number } | null>(null);
+
+  useEffect(() => {
+    const sessionId = user?.id || session?.user?.email || 'guest-session';
+    fetch(`/api/profile/stats?session_id=${sessionId}`)
+      .then(res => res.json())
+      .then(data => setStats(data))
+      .catch(console.error);
+  }, [user?.id, session?.user?.email]);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,11 +119,21 @@ export default function ProfilePage() {
             <CardContent className="p-4 space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground text-[14px]">Total Analyzed</span>
-                <span className="font-bold text-primary dark:text-primary-foreground">{history.length} docs</span>
+                <span className="font-bold text-primary dark:text-primary-foreground">
+                  {stats ? stats.documents_analyzed : history.length} docs
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground text-[14px]">Avg. Risk Score</span>
+                <span className="font-bold text-primary dark:text-primary-foreground">
+                  {stats ? stats.average_risk_score : 0}/100
+                </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground text-[14px]">Member Since</span>
-                <span className="font-bold text-primary dark:text-primary-foreground">April 2026</span>
+                <span className="font-bold text-primary dark:text-primary-foreground">
+                  {stats ? new Date(stats.member_since).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '...'}
+                </span>
               </div>
             </CardContent>
           </Card>
