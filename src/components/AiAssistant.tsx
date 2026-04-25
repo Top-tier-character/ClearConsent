@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { useAppStore } from '@/lib/store';
+import { useState, useRef, useEffect, useImperativeHandle } from 'react';
+import { useAppStore, globalAssistantRef } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { useSession } from 'next-auth/react';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import type { ChatMessage } from '@/lib/store';
 import { toast } from 'sonner';
 
-export const AiAssistant = forwardRef((props, ref) => {
+export function AiAssistant() {
   const { data: session } = useSession();
   const { chatHistory, addChatMessage, clearChatHistory, currentAnalysis, currentSimulation, language, isAiAssistantOpen: isOpen, setAiAssistantOpen: setIsOpen } = useAppStore();
   const [inputText, setInputText] = useState('');
@@ -24,7 +24,7 @@ export const AiAssistant = forwardRef((props, ref) => {
     }
   }, [session?.user?.email]);
 
-  useImperativeHandle(ref, () => ({
+  useImperativeHandle(globalAssistantRef, () => ({
     sendMessage: (text: string) => {
       handleSendDirect(text);
     }
@@ -225,4 +225,4 @@ export const AiAssistant = forwardRef((props, ref) => {
       </div>
     </>
   );
-});
+}
