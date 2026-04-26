@@ -34,7 +34,7 @@ Analyze the financial document and return ONLY this JSON object with no other te
       "quote": "<exact quote from document under 80 chars>",
       "explanation": "<plain language explanation in ${langName}>",
       "severity": "high or medium or low",
-      "action_email": "<complete ready-to-send email in ${langName} with Subject: line and full body that user can send to lender to address this issue>"
+      "action_email": "Write a complete professional email IN ${langName} that the user can copy and send directly to their lender or bank. The email must have:\nSubject: [specific subject about this clause]\n\nDear Sir/Madam,\n\n[3-4 sentences specifically addressing this clause, asking for clarification or removal, referencing the specific clause details from the document]\n\nPlease respond within 7 working days.\n\nYours sincerely,\n[Borrower Name]\n\nThis field must NEVER be empty. Every risk flag must have a complete ready-to-send email."
     }
   ],
   "callout_text": "<extract REAL numbers from document. Example: In total you will pay back Rs 57600 — that is Rs 7600 more than you borrowed. Use only numbers explicitly in the document. NEVER write Rs X or placeholder.>",
@@ -60,7 +60,7 @@ Analyze the financial document and return ONLY this JSON object with no other te
             { role: 'user', content: userPrompt },
           ],
           temperature: 0.1,
-          max_tokens: 3000,
+          max_tokens: 4000,
         });
         const raw = completion.choices[0]?.message?.content ?? '';
         if (!raw) throw new Error('Empty response from AI');

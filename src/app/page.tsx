@@ -92,6 +92,50 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── Sample Analysis Demo Card ───────────────────────────────────────── */}
+      <section style={{ padding: '60px 24px', background: '#F8FAFC' }}>
+        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+          <h2 style={{ fontSize: '28px', fontWeight: 800, textAlign: 'center', marginBottom: '8px', color: '#1B2A4A' }}>
+            See What ClearConsent Finds
+          </h2>
+          <p style={{ textAlign: 'center', color: '#6B7280', marginBottom: '32px', fontSize: '16px' }}>
+            Here is a real example of what our AI found in a typical personal loan agreement
+          </p>
+          <div style={{ background: '#1B2A4A', borderRadius: '16px', padding: '24px', color: 'white' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
+              <span style={{ background: '#EF444420', border: '1px solid #EF4444', color: '#EF4444', padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: 700 }}>
+                32/100 — High Risk
+              </span>
+              <span style={{ color: '#9CA3AF', fontSize: '14px' }}>Personal Loan Agreement • ₹50,000 at 18% APR</span>
+            </div>
+            <div style={{ background: '#EF444415', border: '1px solid #EF4444', borderLeft: '4px solid #EF4444', borderRadius: '8px', padding: '16px', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px' }}>
+                <span style={{ background: '#EF4444', color: 'white', padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: 700 }}>HIGH RISK</span>
+                <span style={{ fontWeight: 700 }}>Auto Bank Deduction Clause</span>
+              </div>
+              <p style={{ color: '#9CA3AF', fontSize: '13px', fontStyle: 'italic', marginBottom: '6px' }}>&ldquo;...reserves the absolute right to automatically mandate deductions from any linked bank accounts...&rdquo;</p>
+              <p style={{ fontSize: '14px', color: '#E5E7EB' }}>The lender can take money from your bank account without asking you first if you miss a payment.</p>
+            </div>
+            <div style={{ background: '#F59E0B15', border: '1px solid #F59E0B', borderLeft: '4px solid #F59E0B', borderRadius: '8px', padding: '16px', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px' }}>
+                <span style={{ background: '#F59E0B', color: 'white', padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: 700 }}>MEDIUM RISK</span>
+                <span style={{ fontWeight: 700 }}>Excessive Late Payment Penalty</span>
+              </div>
+              <p style={{ color: '#9CA3AF', fontSize: '13px', fontStyle: 'italic', marginBottom: '6px' }}>&ldquo;...late payment penalty of ₹800 per week shall be levied...&rdquo;</p>
+              <p style={{ fontSize: '14px', color: '#E5E7EB' }}>If you miss one payment, you will be charged ₹800 every week until you pay — this adds up to ₹3,200 per month in penalties alone.</p>
+            </div>
+            <div style={{ background: '#1E3A5F', borderRadius: '8px', padding: '16px', textAlign: 'center' }}>
+              <p style={{ fontSize: '16px', fontWeight: 700 }}>⚠ In total you will pay back ₹57,600 — that is ₹7,600 more than you borrowed</p>
+            </div>
+          </div>
+          <div style={{ textAlign: 'center', marginTop: '24px' }}>
+            <a href="/analyze" style={{ display: 'inline-block', padding: '16px 40px', background: '#1B2A4A', color: 'white', borderRadius: '12px', fontSize: '18px', fontWeight: 700, textDecoration: 'none' }}>
+              Analyze Your Document Free →
+            </a>
+          </div>
+        </div>
+      </section>
+
       {/* ── Fix 4: How It Works Section ────────────────────────────────────── */}
       <section className="w-full px-4 sm:px-6 py-16 bg-[#FAF9F6] dark:bg-background">
         <div className="container mx-auto max-w-5xl text-center">
