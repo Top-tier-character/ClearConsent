@@ -328,14 +328,14 @@ export default function AnalyzePage() {
                         {flag.severity === 'high' ? '🔴' : '🟡'} {flag.title}
                       </h3>
                       <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '12px' }}>{flag.explanation}</p>
-                      <div style={{ background: '#F9FAFB', borderRadius: '8px', padding: '12px', fontSize: '13px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', marginBottom: '8px', maxHeight: '160px', overflowY: 'auto', border: '1px solid #E5E7EB' }}>
+                      <div style={{ background: '#F9FAFB', color: '#111827', borderRadius: '8px', padding: '12px', fontSize: '13px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', marginBottom: '8px', maxHeight: '160px', overflowY: 'auto', border: '1px solid #E5E7EB' }}>
                         {emailContent}
                       </div>
                       <button onClick={() => handleCopyEmail(emailContent, i)} style={{
                         padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: 600,
-                        border: '1px solid #1B2A4A', cursor: 'pointer',
-                        background: copiedIndex === i ? '#10B981' : 'transparent',
-                        color: copiedIndex === i ? 'white' : '#1B2A4A',
+                        border: '1px solid #E5E7EB', cursor: 'pointer',
+                        background: copiedIndex === i ? '#10B981' : 'var(--background)',
+                        color: copiedIndex === i ? 'white' : 'inherit',
                         display: 'flex', alignItems: 'center', gap: '6px'
                       }}>
                         {copiedIndex === i ? <><Check size={14} /> Copied!</> : <><Copy size={14} /> Copy Email to Lender</>}
