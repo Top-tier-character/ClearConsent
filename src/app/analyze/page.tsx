@@ -225,7 +225,7 @@ export default function AnalyzePage() {
                 background: 'transparent', color: '#1B2A4A', fontSize: '16px',
                 fontWeight: 600, border: '2px solid #1B2A4A', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
-              }} className="md:flex hidden">
+              }} className="md:hidden flex">
                 <Camera size={18} /> Scan with Camera
               </button>
 
