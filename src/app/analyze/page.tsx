@@ -59,6 +59,30 @@ export default function AnalyzePage() {
       if (!res.ok) throw new Error(data.error || 'Analysis failed');
       setAnalysis(data);
       setActiveTab('overview');
+      // Save to Zustand so AI assistant and dashboard are aware of this analysis
+      const { addHistory, setCurrentAnalysis } = useAppStore.getState();
+      setCurrentAnalysis({
+        id: `CLR-${Date.now()}`,
+        documentType: data.document_type,
+        pros: data.pros ?? [],
+        cons: data.cons ?? [],
+        hiddenClauses: data.risk_flags?.map((f: any) => f.explanation) ?? [],
+        specificClauses: data.risk_flags ?? [],
+        repaymentInfo: data.callout_text ?? '',
+        riskScore: data.clearconsent_score ?? 50,
+        risk_explanation: data.score_explanation ?? '',
+        summary: data.summary ?? '',
+        quiz: [],
+        extractedFigures: data.extracted_figures ?? null,
+      });
+      addHistory({
+        id: `CLR-${Date.now()}`,
+        type: 'analysis',
+        date: new Date().toISOString(),
+        riskScore: data.clearconsent_score ?? 50,
+        status: 'approved',
+        details: data,
+      });
     } catch (err) {
       setAnalyzeError(err instanceof Error ? err.message : 'Analysis failed. Please try again.');
     } finally {

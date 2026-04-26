@@ -30,6 +30,9 @@ const LANGUAGE_NAMES: Record<Language, string> = {
  * Supports `simplified` mode for class-5 reading level output.
  * Returns document_type, specific_clauses, and all standard fields.
  */
+// NOTE: This function is NOT used by /api/analyze/route.ts
+// The analyze route has its own inline prompt which is the current version.
+// This function is kept for reference only.
 export function buildAnalyzePrompt(text: string, language: Language, simplified: boolean = false): string {
   const langName = language === 'hi' ? 'Hindi' : language === 'mr' ? 'Marathi' : 'English';
   const readingLevel = simplified
