@@ -1,477 +1,372 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { useAppStore, globalAssistantRef } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
-import { calculateEMI } from '@/lib/finance';
-
-import {
-  FileText, CheckCircle, AlertTriangle, UploadCloud,
-  Loader2, Camera, FileWarning, ShieldAlert, CheckCircle2, Copy, FileQuestion, HelpCircle, ChevronRight, X
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import type { CurrentAnalysis } from '@/lib/store';
-import { toast } from 'sonner';
-
-const DOC_TYPES = [
-  { id: 'Loan Agreement', icon: <FileText className="h-6 w-6" /> },
-  { id: 'Insurance Policy', icon: <ShieldAlert className="h-6 w-6" /> },
-  { id: 'Auto-Pay Mandate', icon: <RefreshCwIcon className="h-6 w-6" /> },
-  { id: 'Account Opening', icon: <FileQuestion className="h-6 w-6" /> },
-];
-
-function RefreshCwIcon(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-      <path d="M3 3v5h5" />
-    </svg>
-  );
-}
+import { useAppStore } from '@/lib/store';
+import { Loader2, UploadCloud, Camera, X, CheckCircle, AlertTriangle, Volume2, Copy, Check } from 'lucide-react';
 
 export default function AnalyzePage() {
-  const { language, setLanguage, simplifiedMode, setSimplifiedMode, currentAnalysis, setCurrentAnalysis, addHistory, setAiAssistantOpen, addChatMessage } = useAppStore();
+  const { language } = useAppStore();
 
-  const [phase, setPhase] = useState<'upload' | 'dashboard'>('upload');
-  const [activeTab, setActiveTab] = useState<'overview' | 'risks' | 'action' | 'numbers'>('overview');
-
-  const [text, setText] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedDocType, setSelectedDocType] = useState<string | null>(null);
-  const [uploadMode, setUploadMode] = useState<'file' | 'paste' | 'camera'>('file');
-  const [selectedParagraphIndex, setSelectedParagraphIndex] = useState<number | null>(null);
-  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
-  const [fileName, setFileName] = useState<string | null>(null);
+  // Upload phase state
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
   const extractedTextRef = useRef<string>('');
-
-  const [incomeOverride, setIncomeOverride] = useState<number>(0);
-  const [incomeDrop, setIncomeDrop] = useState(false);
-
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
-  const rightColumnRef = useRef<HTMLDivElement>(null);
 
-  const paragraphs = currentAnalysis?.rawTextParagraphs || [];
+  // Analysis phase state
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState<any>(null);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'flags' | 'action' | 'numbers'>('overview');
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle PDF file selection
+  const handleFileSelect = async (file: File) => {
+    setExtractError(null);
+    setAnalysis(null);
+    setUploadedFile(file);
+
+    // Show PDF preview immediately using object URL
+    const url = URL.createObjectURL(file);
+    setPdfPreviewUrl(url);
+
+    // Extract text silently in background
+    setIsExtracting(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/extract-pdf', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Extraction failed');
+      extractedTextRef.current = data.text;
+    } catch (err) {
+      setExtractError('Could not read this PDF. Try a different file.');
+      extractedTextRef.current = '';
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
+  // Handle camera capture
+  const handleCameraCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
+    setIsExtracting(true);
+    setExtractError(null);
+    setAnalysis(null);
     try {
-      if (file.type.startsWith('image/')) {
-        const formData = new FormData();
-        formData.append('image', file);
-        const res = await fetch('/api/ocr', { method: 'POST', body: formData });
-        const data = await res.json();
-        setText(data.text);
-      } else if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
-        const content = await file.text();
-        setText(content);
-      } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-        setFileName(file.name);
-        setUploadedFile(file);
-        
-        // Extract text
-        const formData = new FormData();
-        formData.append('file', file);
-        const res = await fetch('/api/extract-pdf', { method: 'POST', body: formData });
-        const data = await res.json();
-        if (data.text) {
-          extractedTextRef.current = data.text;
-        } else {
-          setError(data.error || 'Could not extract text.');
-        }
-      }
-    } catch {
-      setError('Failed to read file');
+      const formData = new FormData();
+      formData.append('image', file);
+      const res = await fetch('/api/ocr', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'OCR failed');
+      extractedTextRef.current = data.text;
+      setUploadedFile(file);
+      setPdfPreviewUrl(URL.createObjectURL(file));
+    } catch (err) {
+      setExtractError('Camera scan failed. Please try again in good lighting.');
+    } finally {
+      setIsExtracting(false);
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
     }
   };
 
-  const runAnalysis = async () => {
-    const textToAnalyze = extractedTextRef.current || text;
-    if (!textToAnalyze.trim()) {
-      setError('Please provide document text.');
+  // Run analysis
+  const handleAnalyze = async () => {
+    if (!extractedTextRef.current.trim()) {
+      setAnalyzeError('Please upload a document first.');
       return;
     }
-    setError(null);
-    setIsLoading(true);
-
+    setAnalyzeError(null);
+    setIsAnalyzing(true);
+    setAnalysis(null);
     try {
-      const response = await fetch('/api/analyze', {
+      const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: textToAnalyze, language, simplified: simplifiedMode }),
+        body: JSON.stringify({
+          text: extractedTextRef.current,
+          language,
+        }),
       });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.details || errData.error || `Analysis failed (${response.status})`);
-      }
-      const data = await response.json();
-
-      const paras = textToAnalyze.split('\n\n').map(p => p.trim()).filter(p => p.length > 0);
-
-      const result: CurrentAnalysis = {
-        id: `CLR-${Date.now()}`,
-        documentType: selectedDocType || data.document_type || 'Financial Document',
-        pros: Array.isArray(data.pros) ? data.pros : [],
-        cons: Array.isArray(data.cons) ? data.cons : [],
-        hiddenClauses: Array.isArray(data.hidden_clauses) ? data.hidden_clauses : [],
-        specificClauses: Array.isArray(data.specific_clauses) ? data.specific_clauses : (Array.isArray(data.risk_flags) ? data.risk_flags : []),
-        actionPlan: Array.isArray(data.action_plan) ? data.action_plan : [],
-        repaymentInfo: data.callout_text || '',
-        riskScore: data.risk_score || 0,
-        risk_explanation: data.risk_explanation || '',
-        summary: data.summary || '',
-        extractedFigures: data.extracted_figures || null,
-        rawTextParagraphs: paras,
-      };
-
-      if (data.extracted_figures?.monthly_income) {
-        setIncomeOverride(data.extracted_figures.monthly_income);
-      }
-
-      setCurrentAnalysis(result);
-      addHistory({ id: result.id, type: 'analysis', date: new Date().toISOString(), riskScore: result.riskScore, details: result });
-      setPhase('dashboard');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Analysis failed');
+      setAnalysis(data);
       setActiveTab('overview');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error');
+      setAnalyzeError(err instanceof Error ? err.message : 'Analysis failed. Please try again.');
     } finally {
-      setIsLoading(false);
+      setIsAnalyzing(false);
     }
   };
 
-  const resetAnalysis = () => {
-    setPhase('upload');
-    setText('');
-    extractedTextRef.current = '';
+  // Clear everything
+  const handleClear = () => {
+    if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
     setUploadedFile(null);
-    setCurrentAnalysis(null);
-    setSelectedParagraphIndex(null);
-    setFileName(null);
+    setPdfPreviewUrl(null);
+    setAnalysis(null);
+    setExtractError(null);
+    setAnalyzeError(null);
+    extractedTextRef.current = '';
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleParagraphClick = (idx: number, pText: string) => {
-    setSelectedParagraphIndex(idx);
-    setActiveTab('risks');
-    // Simple heuristic to scroll right panel
-    if (rightColumnRef.current) {
-      rightColumnRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+  // Copy email to clipboard
+  const handleCopyEmail = (text: string, index: number) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
   };
 
-  const copyEmail = (template: string) => {
-    navigator.clipboard.writeText(template);
-    toast('Email copied to clipboard!');
+  // Speak text aloud
+  const handleSpeak = (text: string) => {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = language === 'hi' ? 'hi-IN' : language === 'mr' ? 'mr-IN' : 'en-IN';
+    window.speechSynthesis.speak(utter);
   };
 
+  const scoreColor = !analysis ? '' :
+    analysis.clearconsent_score >= 70 ? '#10B981' :
+    analysis.clearconsent_score >= 40 ? '#F59E0B' : '#EF4444';
 
+  const scoreLabel = !analysis ? '' :
+    analysis.clearconsent_score >= 70 ? 'Safe' :
+    analysis.clearconsent_score >= 40 ? 'Moderate Risk' : 'High Risk';
 
-  // Safe parsed numbers for Numbers tab
-  const loanAmount = currentAnalysis?.extractedFigures?.loan_amount || 0;
-  const interestRate = currentAnalysis?.extractedFigures?.interest_rate || 0;
-  const tenureMonths = currentAnalysis?.extractedFigures?.tenure_months || 0;
-  
-  const emiCalc = loanAmount > 0 ? calculateEMI(loanAmount, interestRate, tenureMonths) : 0;
-  const actualIncome = incomeDrop ? incomeOverride * 0.8 : incomeOverride;
-  const ratio = actualIncome > 0 ? (emiCalc / actualIncome) * 100 : 0;
-
-  if (phase === 'upload') {
-    return (
-      <div className="container mx-auto px-4 py-12 max-w-4xl">
-        <div className="text-center mb-10">
-          <h1 className="text-4xl font-extrabold text-[#1B2A4A] dark:text-white tracking-tight mb-4">Analyze Your Document</h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Upload any contract, loan agreement, or financial policy. We will instantly translate it into plain language and uncover hidden risks.
-          </p>
-        </div>
-
-        <div className="bg-[#FAF9F6] dark:bg-card rounded-3xl p-8 border-4 border-dashed border-[#1B2A4A]/20 dark:border-border min-h-[320px] flex flex-col items-center justify-center gap-8 transition-colors">
-          
-          <div className="w-full max-w-2xl flex flex-col gap-6">
-            <div className="flex flex-col items-center w-full">
-              <input ref={fileInputRef} type="file" accept=".txt,.pdf" className="hidden" onChange={handleFileUpload} />
-              <Button onClick={() => fileInputRef.current?.click()} className="h-16 w-full text-lg font-bold rounded-xl shadow-md bg-[#1B2A4A] hover:bg-[#1B2A4A]/90 text-white transition-all">
-                <UploadCloud className="mr-3 h-6 w-6" /> Select File from Device
-              </Button>
-              {fileName && <p className="mt-3 text-success font-bold flex items-center"><CheckCircle2 className="mr-2 h-5 w-5"/> {fileName} loaded!</p>}
-              
-              {uploadedFile && (
-                <iframe
-                  src={URL.createObjectURL(uploadedFile)}
-                  style={{
-                    width: '100%',
-                    height: '500px',
-                    border: '1px solid #E5E7EB',
-                    borderRadius: '12px',
-                    marginTop: '16px',
-                  }}
-                  title="PDF Preview"
-                />
-              )}
-            </div>
-          </div>
-
-          <div className="w-full max-w-2xl border-t border-border/50 pt-8 mt-4">
-            <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-4 text-center">What kind of document is this?</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {DOC_TYPES.map(dt => (
-                <button
-                  key={dt.id}
-                  onClick={() => setSelectedDocType(dt.id)}
-                  className={cn("flex flex-col items-center p-4 rounded-2xl border-2 transition-all bg-white dark:bg-black", selectedDocType === dt.id ? "border-[#1B2A4A] bg-[#1B2A4A]/5" : "border-border hover:border-[#1B2A4A]/40")}
-                >
-                  <div className={cn("mb-2", selectedDocType === dt.id ? "text-[#1B2A4A] dark:text-white" : "text-muted-foreground")}>{dt.icon}</div>
-                  <span className="text-xs font-bold text-center">{dt.id}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="w-full max-w-2xl flex flex-col sm:flex-row items-center gap-4">
-             <select 
-               className="h-14 px-4 rounded-xl border-2 border-border bg-white dark:bg-black font-semibold text-lg min-w-[140px]"
-               value={language}
-               onChange={(e: any) => setLanguage(e.target.value)}
-             >
-               <option value="en">English</option>
-               <option value="hi">हिन्दी</option>
-               <option value="mr">मराठी</option>
-             </select>
-             
-             <Button 
-               className="flex-1 h-14 bg-[#1B2A4A] hover:bg-[#1B2A4A]/90 text-white text-lg font-bold rounded-xl"
-               onClick={runAnalysis}
-               disabled={isLoading || (!text && !extractedTextRef.current)}
-             >
-               {isLoading ? <Loader2 className="animate-spin h-6 w-6" /> : "Analyze Document →"}
-             </Button>
-          </div>
-          {error && <p className="text-red-500 font-bold">{error}</p>}
-
-          <p className="flex items-center text-xs text-muted-foreground font-semibold mt-4">
-            <ShieldAlert className="h-4 w-4 mr-2" /> Your document is analyzed privately and never stored without consent.
-          </p>
-
-        </div>
-      </div>
-    );
-  }
-
-  // PHASE 2: DASHBOARD
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-72px)] overflow-hidden bg-background">
-      
-      {/* LEFT COLUMN: Document Viewer */}
-      <div className="w-full md:w-1/2 h-full flex flex-col border-r border-border bg-[#FAF9F6] dark:bg-background">
-        <div className="flex items-center justify-between p-4 bg-white dark:bg-card border-b border-border z-10 shrink-0">
-          <div className="flex flex-col">
-            <span className="font-bold text-[#1B2A4A] dark:text-white text-lg flex items-center gap-2">
-               {currentAnalysis?.documentType} <span className="text-xs font-normal bg-muted px-2 py-0.5 rounded-full">{paragraphs.length} paragraphs</span>
-            </span>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)' }}>
+
+      {/* Top bar — only shown after analysis */}
+      {analysis && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '16px',
+          padding: '12px 24px', borderBottom: '1px solid #E5E7EB',
+          background: 'var(--background)'
+        }}>
+          <span style={{
+            background: '#1B2A4A', color: 'white',
+            padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: 700
+          }}>
+            📄 {analysis.document_type}
+          </span>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {(['overview', 'flags', 'action', 'numbers'] as const).map(tab => (
+              <button key={tab} onClick={() => setActiveTab(tab)} style={{
+                padding: '6px 16px', borderRadius: '8px', fontSize: '14px', fontWeight: 600,
+                background: activeTab === tab ? '#1B2A4A' : 'transparent',
+                color: activeTab === tab ? 'white' : 'inherit',
+                border: activeTab === tab ? 'none' : '1px solid #E5E7EB',
+                cursor: 'pointer'
+              }}>
+                {tab === 'overview' ? 'Overview' :
+                 tab === 'flags' ? `Risk Flags (${analysis.risk_flags?.length ?? 0})` :
+                 tab === 'action' ? 'Action Plan' : 'Numbers'}
+              </button>
+            ))}
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 pr-3 border-r border-border hidden sm:flex">
-              <Switch id="simplify" checked={simplifiedMode} onCheckedChange={setSimplifiedMode} />
-              <label htmlFor="simplify" className="text-xs font-bold cursor-pointer">Simplified Mode</label>
+          <button onClick={handleClear} style={{
+            marginLeft: 'auto', padding: '6px 16px', borderRadius: '8px',
+            border: '1px solid #E5E7EB', cursor: 'pointer', fontSize: '14px'
+          }}>
+            + New Document
+          </button>
+        </div>
+      )}
+
+      {/* Main content */}
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+
+        {/* LEFT — Upload zone or PDF viewer */}
+        <div style={{
+          width: analysis ? '50%' : '100%',
+          borderRight: analysis ? '1px solid #E5E7EB' : 'none',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          padding: analysis ? '0' : '40px',
+          alignItems: analysis ? 'stretch' : 'center',
+          justifyContent: analysis ? 'flex-start' : 'center',
+        }}>
+
+          {!uploadedFile ? (
+            /* Upload zone */
+            <div style={{
+              border: '2px dashed #E5E7EB', borderRadius: '16px',
+              padding: '48px 32px', textAlign: 'center', maxWidth: '560px', width: '100%'
+            }}>
+              <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#1B2A4A', marginBottom: '8px' }}>
+                Analyze Your Document
+              </h1>
+              <p style={{ color: '#6B7280', marginBottom: '32px', fontSize: '16px' }}>
+                Upload any loan agreement, insurance policy, or financial contract.
+                Our AI will find the hidden traps and tell you exactly what to do.
+              </p>
+
+              <input ref={fileInputRef} type="file" accept=".pdf,.txt"
+                className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }} />
+              <input ref={cameraInputRef} type="file" accept="image/*" capture="environment"
+                className="hidden" onChange={handleCameraCapture} />
+
+              <button onClick={() => fileInputRef.current?.click()} style={{
+                width: '100%', padding: '16px', borderRadius: '12px',
+                background: '#1B2A4A', color: 'white', fontSize: '18px',
+                fontWeight: 700, border: 'none', cursor: 'pointer', marginBottom: '12px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+              }}>
+                <UploadCloud size={20} /> Upload PDF or TXT File
+              </button>
+
+              <button onClick={() => cameraInputRef.current?.click()} style={{
+                width: '100%', padding: '12px', borderRadius: '12px',
+                background: 'transparent', color: '#1B2A4A', fontSize: '16px',
+                fontWeight: 600, border: '2px solid #1B2A4A', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+              }} className="md:flex hidden">
+                <Camera size={18} /> Scan with Camera
+              </button>
+
+              <p style={{ marginTop: '16px', fontSize: '13px', color: '#9CA3AF' }}>
+                🔒 Your document is analyzed privately and never stored without your consent
+              </p>
             </div>
-            <Button variant="outline" size="sm" className="font-bold border-border" onClick={resetAnalysis}>
-              📷 New
-            </Button>
-          </div>
-        </div>
+          ) : (
+            /* PDF Preview */
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '12px',
+                padding: '12px 16px', borderBottom: '1px solid #E5E7EB'
+              }}>
+                <span style={{ fontSize: '14px', fontWeight: 600, flex: 1 }}>
+                  📄 {uploadedFile.name}
+                </span>
+                {isExtracting && <span style={{ fontSize: '13px', color: '#6B7280' }}>Reading document...</span>}
+                {!isExtracting && extractedTextRef.current && (
+                  <span style={{ fontSize: '13px', color: '#10B981', fontWeight: 600 }}>✓ Ready to analyze</span>
+                )}
+                <button onClick={handleClear} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                  <X size={16} />
+                </button>
+              </div>
 
-        <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
-          <div className="max-w-2xl mx-auto space-y-4 pb-20">
-            {pdfPreviewUrl ? (
-              <iframe
-                src={pdfPreviewUrl}
-                className="w-full h-full rounded-lg"
-                style={{ minHeight: '600px', border: 'none' }}
-                title="Document Preview"
-              />
-            ) : paragraphs.length > 0 ? (
-              paragraphs.map((p, idx) => {
-                const isSelected = selectedParagraphIndex === idx;
-                return (
-                  <p 
-                    key={idx}
-                    data-index={idx}
-                    onClick={() => handleParagraphClick(idx, p)}
-                    className={cn(
-                      "p-3 rounded-lg text-[15px] leading-relaxed cursor-pointer transition-colors border",
-                      isSelected ? "bg-[#1B2A4A]/10 border-[#1B2A4A] dark:bg-[#1B2A4A]/40 dark:border-white shadow-sm" : "bg-white dark:bg-black border-transparent hover:bg-[#1B2A4A]/5 hover:border-border"
-                    )}
-                  >
-                    {p}
-                  </p>
-                );
-              })
-            ) : null}
-          </div>
-        </div>
-      </div>
-
-      {/* RIGHT COLUMN: AI Insights */}
-      <div className="w-full md:w-1/2 h-[50vh] md:h-full flex flex-col bg-white dark:bg-card" ref={rightColumnRef}>
-        
-        {/* TABS */}
-        <div className="flex items-center gap-1 border-b border-border p-2 bg-muted/20 shrink-0 overflow-x-auto hide-scrollbar">
-          {(['overview', 'risks', 'action', 'numbers'] as const).map(t => (
-            <button
-              key={t}
-              onClick={() => setActiveTab(t)}
-              className={cn(
-                "px-4 py-2.5 text-sm font-bold rounded-lg whitespace-nowrap transition-all",
-                activeTab === t ? "bg-white dark:bg-black text-[#1B2A4A] dark:text-white shadow-sm border border-border" : "text-muted-foreground hover:bg-muted/50"
+              {pdfPreviewUrl && uploadedFile.type === 'application/pdf' ? (
+                <iframe src={pdfPreviewUrl} style={{ flex: 1, border: 'none', width: '100%' }} title="PDF" />
+              ) : (
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <p style={{ color: '#6B7280' }}>Image captured — ready to analyze</p>
+                </div>
               )}
-            >
-              {t === 'overview' && 'Overview'}
-              {t === 'risks' && `Risk Flags (${currentAnalysis?.specificClauses?.length || 0})`}
-              {t === 'action' && 'Action Plan'}
-              {t === 'numbers' && 'Numbers'}
-            </button>
-          ))}
+
+              {extractError && (
+                <div style={{ padding: '12px 16px', background: '#FEF2F2', color: '#EF4444', fontSize: '14px' }}>
+                  {extractError}
+                </div>
+              )}
+
+              {!analysis && (
+                <div style={{ padding: '16px', borderTop: '1px solid #E5E7EB' }}>
+                  {analyzeError && (
+                    <p style={{ color: '#EF4444', fontSize: '14px', marginBottom: '8px' }}>{analyzeError}</p>
+                  )}
+                  <button
+                    onClick={handleAnalyze}
+                    disabled={isAnalyzing || isExtracting || !extractedTextRef.current}
+                    style={{
+                      width: '100%', padding: '16px', borderRadius: '12px',
+                      background: isAnalyzing || isExtracting || !extractedTextRef.current ? '#9CA3AF' : '#1B2A4A',
+                      color: 'white', fontSize: '18px', fontWeight: 700,
+                      border: 'none', cursor: isAnalyzing ? 'wait' : 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                    }}>
+                    {isAnalyzing ? <><Loader2 size={20} className="animate-spin" /> Analyzing document...</> :
+                     isExtracting ? <><Loader2 size={20} className="animate-spin" /> Reading file...</> :
+                     'Analyze This Document →'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-xl mx-auto pb-20">
+        {/* RIGHT — Analysis results */}
+        {analysis && (
+          <div style={{ width: '50%', overflowY: 'auto', padding: '24px' }}>
 
-            {/* OVERVIEW TAB */}
+            {/* Overview tab */}
             {activeTab === 'overview' && (
-              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
-                <div className="flex flex-col items-center justify-center text-center p-8 bg-[#FAF9F6] dark:bg-black rounded-3xl border border-border">
-                  <div className={cn(
-                    "w-32 h-32 rounded-full flex flex-col items-center justify-center border-[8px] mb-4",
-                    (currentAnalysis?.riskScore || 0) < 30 ? "border-green-500 text-green-600 dark:text-green-400" :
-                    (currentAnalysis?.riskScore || 0) < 70 ? "border-yellow-500 text-yellow-600 dark:text-yellow-400" :
-                    "border-red-500 text-red-600 dark:text-red-400"
-                  )}>
-                    <span className="text-4xl font-black">{currentAnalysis?.riskScore}</span>
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Score</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Score card */}
+                <div style={{
+                  background: '#1B2A4A', borderRadius: '16px', padding: '32px',
+                  textAlign: 'center', color: 'white'
+                }}>
+                  <div style={{
+                    width: '120px', height: '120px', borderRadius: '50%',
+                    border: `8px solid ${scoreColor}`, margin: '0 auto 16px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexDirection: 'column'
+                  }}>
+                    <span style={{ fontSize: '36px', fontWeight: 800, color: scoreColor }}>
+                      {analysis.clearconsent_score}
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#9CA3AF' }}>/ 100</span>
                   </div>
-                  <h3 className="text-xl font-bold text-[#1B2A4A] dark:text-white mb-2">{currentAnalysis?.documentType}</h3>
-                  <p className="text-sm font-medium text-muted-foreground">{currentAnalysis?.risk_explanation}</p>
+                  <div style={{
+                    display: 'inline-block', padding: '4px 16px', borderRadius: '20px',
+                    background: scoreColor, fontSize: '14px', fontWeight: 700, marginBottom: '8px'
+                  }}>
+                    {scoreLabel}
+                  </div>
+                  <p style={{ color: '#9CA3AF', fontSize: '14px' }}>{analysis.score_explanation}</p>
                 </div>
 
-                <div className="grid gap-6">
-                  <div className="space-y-3">
-                    <h4 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-500"/> Key Benefits</h4>
-                    <ul className="space-y-2">
-                      {currentAnalysis?.pros.map((pro: string, i: number) => (
-                        <li key={i} className="flex items-start gap-3 bg-green-50 dark:bg-green-900/10 p-3 rounded-xl border border-green-100 dark:border-green-900/30">
-                          <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
-                          <span className="text-sm font-semibold">{pro}</span>
-                        </li>
-                      ))}
-                    </ul>
+                {/* Callout */}
+                {analysis.callout_text && (
+                  <div style={{
+                    background: '#1B2A4A', borderRadius: '12px', padding: '20px',
+                    color: 'white', fontSize: '18px', fontWeight: 700, lineHeight: 1.4
+                  }}>
+                    ⚠ {analysis.callout_text}
                   </div>
+                )}
 
-                  <div className="space-y-3">
-                    <h4 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-orange-500"/> Obligations</h4>
-                    <ul className="space-y-2">
-                      {currentAnalysis?.cons.map((con: string, i: number) => (
-                        <li key={i} className="flex items-start gap-3 bg-orange-50 dark:bg-orange-900/10 p-3 rounded-xl border border-orange-100 dark:border-orange-900/30">
-                          <AlertTriangle className="h-5 w-5 text-orange-600 shrink-0 mt-0.5" />
-                          <span className="text-sm font-semibold">{con}</span>
-                        </li>
-                      ))}
-                    </ul>
+                {/* Summary */}
+                {analysis.summary && (
+                  <div style={{ background: 'var(--card)', borderRadius: '12px', padding: '20px', border: '1px solid #E5E7EB' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <h3 style={{ fontWeight: 700, fontSize: '16px' }}>Summary</h3>
+                      <button onClick={() => handleSpeak(analysis.summary)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                        <Volume2 size={16} />
+                      </button>
+                    </div>
+                    <p style={{ fontSize: '15px', lineHeight: 1.6 }}>{analysis.summary}</p>
                   </div>
-                </div>
-              </div>
-            )}
+                )}
 
-            {/* RISKS TAB */}
-            {activeTab === 'risks' && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-                <h3 className="text-2xl font-black text-[#1B2A4A] dark:text-white">We found {currentAnalysis?.specificClauses?.length || 0} red flags in this document.</h3>
-                
-                <div className="space-y-4">
-                  {currentAnalysis?.specificClauses?.map((flag: any, i: number) => {
-                    const isHigh = flag.severity === 'high';
-                    const isMed = flag.severity === 'medium';
-                    return (
-                      <div key={i} className={cn(
-                        "p-5 rounded-2xl border-l-[6px] border-y border-r shadow-sm",
-                        isHigh ? "border-l-red-500 border-red-100 dark:border-red-900/30 bg-red-50/30 dark:bg-red-900/10" :
-                        isMed ? "border-l-orange-500 border-orange-100 dark:border-orange-900/30 bg-orange-50/30 dark:bg-orange-900/10" :
-                        "border-l-yellow-500 border-yellow-100 dark:border-yellow-900/30 bg-yellow-50/30 dark:bg-yellow-900/10"
-                      )}>
-                        <div className="flex items-center justify-between mb-3">
-                          <span className={cn(
-                            "px-2 py-1 text-[11px] font-black uppercase tracking-wider rounded-md",
-                            isHigh ? "bg-red-500 text-white" : isMed ? "bg-orange-500 text-white" : "bg-yellow-500 text-white"
-                          )}>
-                            {isHigh ? '🔴 High Risk' : isMed ? '🟡 Medium Risk' : '🟢 Standard'}
-                          </span>
-                          <Button variant="ghost" size="sm" className="text-xs font-bold h-8">
-                            Find in Document <ChevronRight className="ml-1 h-3 w-3" />
-                          </Button>
-                        </div>
-                        <blockquote className="text-[13px] italic text-muted-foreground border-l-[3px] border-border pl-3 mb-3 font-serif">
-                          "{flag.quote || flag.text}"
-                        </blockquote>
-                        <p className="text-[15px] font-semibold text-foreground">{flag.explanation}</p>
+                {/* Pros */}
+                {analysis.pros?.length > 0 && (
+                  <div style={{ background: 'var(--card)', borderRadius: '12px', padding: '20px', border: '1px solid #E5E7EB', borderLeft: '6px solid #10B981' }}>
+                    <h3 style={{ fontWeight: 700, fontSize: '16px', marginBottom: '12px', color: '#10B981' }}>✓ What You Get</h3>
+                    {analysis.pros.map((p: string, i: number) => (
+                      <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px', fontSize: '15px' }}>
+                        <CheckCircle size={16} color="#10B981" style={{ marginTop: '2px', flexShrink: 0 }} />
+                        {p}
                       </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* ACTION PLAN TAB */}
-            {activeTab === 'action' && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-                <h3 className="text-2xl font-black text-[#1B2A4A] dark:text-white">Here is what you should do before signing.</h3>
-                
-                {(!currentAnalysis?.actionPlan || currentAnalysis.actionPlan.length === 0) ? (
-                  <div className="p-8 text-center border-2 border-dashed border-border rounded-2xl">
-                    <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                    <p className="text-lg font-bold">No critical actions needed.</p>
-                    <p className="text-muted-foreground text-sm">This document looks relatively safe.</p>
+                    ))}
                   </div>
-                ) : (
-                  <div className="space-y-6">
-                    {currentAnalysis.actionPlan.map((action: any, i: number) => (
-                      <div key={i} className="bg-white dark:bg-black border-2 border-border rounded-2xl p-6 shadow-sm relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-2 h-full bg-[#1B2A4A]"></div>
-                        <h4 className="text-lg font-black text-[#1B2A4A] dark:text-white mb-2">{action.riskTitle}</h4>
-                        <p className="text-[15px] text-muted-foreground font-medium mb-6">{action.actionText}</p>
-                        
-                        <div className="flex flex-col sm:flex-row gap-3">
-                          <Button className="flex-1 bg-[#1B2A4A] hover:bg-[#1B2A4A]/90 text-white font-bold h-12 rounded-xl" onClick={() => copyEmail(action.emailTemplate)}>
-                            <Copy className="mr-2 h-4 w-4" /> Copy Email to Lender
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            className="flex-1 border-[#1B2A4A] text-[#1B2A4A] dark:border-white dark:text-white font-bold h-12 rounded-xl"
-                            onClick={() => {
-                              setAiAssistantOpen(true);
-                              setTimeout(() => {
-                                globalAssistantRef.current?.sendMessage(`Explain this clause: "${action.riskTitle}". What does it mean?`);
-                              }, 300);
-                            }}
-                          >
-                            <HelpCircle className="mr-2 h-4 w-4" /> Ask AI About This
-                          </Button>
-                        </div>
+                )}
+
+                {/* Cons */}
+                {analysis.cons?.length > 0 && (
+                  <div style={{ background: 'var(--card)', borderRadius: '12px', padding: '20px', border: '1px solid #E5E7EB', borderLeft: '6px solid #F59E0B' }}>
+                    <h3 style={{ fontWeight: 700, fontSize: '16px', marginBottom: '12px', color: '#F59E0B' }}>⚠ What You Must Pay or Do</h3>
+                    {analysis.cons.map((c: string, i: number) => (
+                      <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px', fontSize: '15px' }}>
+                        <AlertTriangle size={16} color="#F59E0B" style={{ marginTop: '2px', flexShrink: 0 }} />
+                        {c}
                       </div>
                     ))}
                   </div>
@@ -479,79 +374,155 @@ export default function AnalyzePage() {
               </div>
             )}
 
-            {/* NUMBERS TAB */}
-            {activeTab === 'numbers' && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-                <h3 className="text-2xl font-black text-[#1B2A4A] dark:text-white">The Real Cost</h3>
-                <p className="text-sm text-muted-foreground bg-muted p-3 rounded-lg border border-border inline-flex items-center gap-2">
-                   <FileText className="h-4 w-4" /> Extracted directly from your document
+            {/* Risk Flags tab */}
+            {activeTab === 'flags' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <h2 style={{ fontSize: '20px', fontWeight: 800 }}>
+                  🚨 {analysis.risk_flags?.length ?? 0} Risk Flags Found
+                </h2>
+                {(analysis.risk_flags ?? []).map((flag: any, i: number) => (
+                  <div key={i} style={{
+                    borderRadius: '12px', padding: '20px',
+                    borderTop: '1px solid',
+                    borderRight: '1px solid',
+                    borderBottom: '1px solid',
+                    borderLeft: '6px solid',
+                    borderColor: flag.severity === 'high' ? '#EF4444' : flag.severity === 'medium' ? '#F59E0B' : '#10B981',
+                    background: 'var(--card)'
+                  }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{
+                        padding: '2px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700,
+                        background: flag.severity === 'high' ? '#EF4444' : flag.severity === 'medium' ? '#F59E0B' : '#10B981',
+                        color: 'white', textTransform: 'uppercase' as const
+                      }}>
+                        {flag.severity} risk
+                      </span>
+                      <span style={{ fontWeight: 700, fontSize: '15px' }}>{flag.title}</span>
+                    </div>
+                    {flag.quote && (
+                      <blockquote style={{
+                        borderLeft: '3px solid #E5E7EB', paddingLeft: '12px',
+                        color: '#6B7280', fontSize: '13px', fontStyle: 'italic',
+                        marginBottom: '8px'
+                      }}>
+                        &ldquo;{flag.quote}&rdquo;
+                      </blockquote>
+                    )}
+                    <p style={{ fontSize: '14px', lineHeight: 1.6 }}>{flag.explanation}</p>
+                  </div>
+                ))}
+                {(!analysis.risk_flags || analysis.risk_flags.length === 0) && (
+                  <div style={{ textAlign: 'center', padding: '40px', color: '#10B981', fontSize: '18px', fontWeight: 700 }}>
+                    ✓ No major risk flags found in this document
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Action Plan tab */}
+            {activeTab === 'action' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <h2 style={{ fontSize: '20px', fontWeight: 800 }}>📋 Your Action Plan</h2>
+                <p style={{ color: '#6B7280', fontSize: '15px' }}>
+                  Here is exactly what you should do before signing this document.
                 </p>
+                {(analysis.risk_flags ?? []).filter((f: any) => f.action_email).map((flag: any, i: number) => (
+                  <div key={i} style={{
+                    background: 'var(--card)', borderRadius: '12px', padding: '20px',
+                    border: '1px solid #E5E7EB'
+                  }}>
+                    <h3 style={{ fontWeight: 700, fontSize: '15px', marginBottom: '4px' }}>
+                      {flag.severity === 'high' ? '🔴' : '🟡'} {flag.title}
+                    </h3>
+                    <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '12px' }}>{flag.explanation}</p>
+                    {flag.action_email && (
+                      <>
+                        <div style={{
+                          background: '#F9FAFB', borderRadius: '8px', padding: '12px',
+                          fontSize: '13px', fontFamily: 'monospace', whiteSpace: 'pre-wrap',
+                          marginBottom: '8px', maxHeight: '120px', overflowY: 'auto',
+                          border: '1px solid #E5E7EB'
+                        }}>
+                          {flag.action_email}
+                        </div>
+                        <button
+                          onClick={() => handleCopyEmail(flag.action_email, i)}
+                          style={{
+                            padding: '8px 16px', borderRadius: '8px', fontSize: '13px',
+                            fontWeight: 600, border: '1px solid #1B2A4A', cursor: 'pointer',
+                            background: copiedIndex === i ? '#10B981' : 'transparent',
+                            color: copiedIndex === i ? 'white' : '#1B2A4A',
+                            display: 'flex', alignItems: 'center', gap: '6px'
+                          }}>
+                          {copiedIndex === i ? <><Check size={14} /> Copied!</> : <><Copy size={14} /> Copy Email to Lender</>}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ))}
+                {(!analysis.risk_flags || analysis.risk_flags.filter((f: any) => f.action_email).length === 0) && (
+                  <div style={{ textAlign: 'center', padding: '40px', color: '#10B981', fontSize: '18px', fontWeight: 700 }}>
+                    ✓ No immediate action required for this document
+                  </div>
+                )}
+              </div>
+            )}
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-[#FAF9F6] dark:bg-black p-5 rounded-2xl border border-border">
-                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Loan Amount</p>
-                    <p className="text-2xl font-black">₹{currentAnalysis?.extractedFigures?.loan_amount?.toLocaleString() || '---'}</p>
-                  </div>
-                  <div className="bg-[#FAF9F6] dark:bg-black p-5 rounded-2xl border border-border">
-                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Interest Rate</p>
-                    <p className="text-2xl font-black">{currentAnalysis?.extractedFigures?.interest_rate || '---'}%</p>
-                  </div>
-                  <div className="bg-[#FAF9F6] dark:bg-black p-5 rounded-2xl border border-border">
-                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Tenure</p>
-                    <p className="text-2xl font-black">{currentAnalysis?.extractedFigures?.tenure_months || '---'} mo</p>
-                  </div>
-                  <div className="bg-[#FAF9F6] dark:bg-black p-5 rounded-2xl border border-border">
-                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Calculated EMI</p>
-                    <p className="text-2xl font-black">₹{emiCalc ? emiCalc.toFixed(0) : '---'}</p>
-                  </div>
-                </div>
-
-                <div className="mt-8 space-y-6 bg-white dark:bg-black p-6 rounded-3xl border-2 border-border shadow-sm">
-                  <h4 className="font-black text-lg">Affordability Check</h4>
-                  
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <label className="text-sm font-bold">Your Monthly Income (₹)</label>
-                      <span className="font-black text-lg">₹{incomeOverride.toLocaleString()}</span>
+            {/* Numbers tab */}
+            {activeTab === 'numbers' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <h2 style={{ fontSize: '20px', fontWeight: 800 }}>🧮 The Real Numbers</h2>
+                {analysis.extracted_figures ? (() => {
+                  const f = analysis.extracted_figures;
+                  const P = f.loan_amount;
+                  const r = f.interest_rate ? f.interest_rate / 12 / 100 : null;
+                  const n = f.tenure_months;
+                  const emi = P && r && n ? Math.round(P * r * Math.pow(1+r,n) / (Math.pow(1+r,n)-1)) : null;
+                  const total = emi && n ? emi * n : null;
+                  const extra = total && P ? total - P : null;
+                  const ratio = emi && f.monthly_income ? Math.round(emi / f.monthly_income * 100) : null;
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      {P && <div style={{ background: 'var(--card)', borderRadius: '12px', padding: '20px', border: '1px solid #E5E7EB', textAlign: 'center' }}>
+                        <div style={{ fontSize: '12px', color: '#6B7280', fontWeight: 600, marginBottom: '4px' }}>LOAN AMOUNT</div>
+                        <div style={{ fontSize: '28px', fontWeight: 800, color: '#1B2A4A' }}>₹{P.toLocaleString('en-IN')}</div>
+                      </div>}
+                      {emi && <div style={{ background: 'var(--card)', borderRadius: '12px', padding: '20px', border: '1px solid #E5E7EB', textAlign: 'center' }}>
+                        <div style={{ fontSize: '12px', color: '#6B7280', fontWeight: 600, marginBottom: '4px' }}>MONTHLY EMI</div>
+                        <div style={{ fontSize: '28px', fontWeight: 800, color: '#1B2A4A' }}>₹{emi.toLocaleString('en-IN')}</div>
+                      </div>}
+                      {total && <div style={{ background: 'var(--card)', borderRadius: '12px', padding: '20px', border: '1px solid #EF4444', textAlign: 'center' }}>
+                        <div style={{ fontSize: '12px', color: '#6B7280', fontWeight: 600, marginBottom: '4px' }}>TOTAL REPAYMENT</div>
+                        <div style={{ fontSize: '28px', fontWeight: 800, color: '#EF4444' }}>₹{total.toLocaleString('en-IN')}</div>
+                      </div>}
+                      {extra && <div style={{ background: 'var(--card)', borderRadius: '12px', padding: '20px', border: '1px solid #EF4444', textAlign: 'center' }}>
+                        <div style={{ fontSize: '12px', color: '#6B7280', fontWeight: 600, marginBottom: '4px' }}>EXTRA YOU PAY</div>
+                        <div style={{ fontSize: '28px', fontWeight: 800, color: '#EF4444' }}>₹{extra.toLocaleString('en-IN')}</div>
+                      </div>}
+                      {ratio && <div style={{ background: 'var(--card)', borderRadius: '12px', padding: '20px', border: `1px solid ${ratio > 50 ? '#EF4444' : ratio > 30 ? '#F59E0B' : '#10B981'}`, textAlign: 'center', gridColumn: '1 / -1' }}>
+                        <div style={{ fontSize: '12px', color: '#6B7280', fontWeight: 600, marginBottom: '4px' }}>EMI AS % OF INCOME</div>
+                        <div style={{ fontSize: '28px', fontWeight: 800, color: ratio > 50 ? '#EF4444' : ratio > 30 ? '#F59E0B' : '#10B981' }}>{ratio}%</div>
+                        <div style={{ fontSize: '13px', color: '#6B7280', marginTop: '4px' }}>
+                          {ratio > 50 ? '⚠ Dangerous — more than half your income goes to EMI' :
+                           ratio > 30 ? '⚠ Caution — significant portion of income committed' :
+                           '✓ Manageable — within safe EMI range'}
+                        </div>
+                      </div>}
                     </div>
-                    <input 
-                      type="number" 
-                      value={incomeOverride || ''} 
-                      onChange={(e) => setIncomeOverride(Number(e.target.value))}
-                      className="w-full h-12 px-4 rounded-xl border-2 border-border bg-transparent focus:border-[#1B2A4A] outline-none font-bold"
-                      placeholder="Enter income to see risk..."
-                    />
-                  </div>
-
-                  {incomeOverride > 0 && emiCalc > 0 && (
-                    <div className="space-y-4 pt-4 border-t border-border">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-bold text-muted-foreground">EMI to Income Ratio</span>
-                        <span className={cn("font-black text-xl", ratio > 40 ? "text-red-500" : ratio > 30 ? "text-orange-500" : "text-green-500")}>
-                          {ratio.toFixed(1)}%
-                        </span>
-                      </div>
-                      
-                      <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
-                        <div className={cn("h-full transition-all", ratio > 40 ? "bg-red-500" : ratio > 30 ? "bg-orange-500" : "bg-green-500")} style={{ width: `${Math.min(ratio, 100)}%` }}></div>
-                      </div>
-
-                      <div className="flex items-center gap-2 pt-2">
-                        <Switch id="incomeDrop" checked={incomeDrop} onCheckedChange={setIncomeDrop} />
-                        <label htmlFor="incomeDrop" className="text-sm font-bold cursor-pointer">What if income drops by 20%?</label>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
+                  );
+                })() : (
+                  <p style={{ color: '#6B7280', padding: '20px', textAlign: 'center' }}>
+                    No financial figures could be extracted from this document.
+                    Use the Simulate page to calculate manually.
+                  </p>
+                )}
               </div>
             )}
 
           </div>
-        </div>
-
+        )}
       </div>
-
     </div>
   );
 }

@@ -1,27 +1,30 @@
-export function parseGroqJson<T>(raw: string): T {
+export function parseGroqJson<T = any>(raw: string): T {
+  if (!raw || typeof raw !== 'string') {
+    throw new Error('Empty or invalid response from AI');
+  }
+
   let cleaned = raw
     .replace(/^```json\s*/i, '')
     .replace(/^```\s*/i, '')
     .replace(/```\s*$/i, '')
     .trim();
 
-  const firstBrace = cleaned.indexOf('{');
-  const lastBrace = cleaned.lastIndexOf('}');
+  const first = cleaned.indexOf('{');
+  const last = cleaned.lastIndexOf('}');
 
-  if (firstBrace === -1 || lastBrace === -1) {
-    throw new Error(`No JSON found in: ${cleaned.slice(0, 100)}`);
+  if (first === -1 || last === -1 || last <= first) {
+    throw new Error(`No valid JSON object found. Response was: ${cleaned.slice(0, 200)}`);
   }
 
-  cleaned = cleaned.slice(firstBrace, lastBrace + 1);
+  cleaned = cleaned.slice(first, last + 1);
 
   try {
     return JSON.parse(cleaned) as T;
   } catch {
-    // Try to fix common JSON issues: trailing commas, control chars
     const fixed = cleaned
-      .replace(/,\s*}/g, '}')
-      .replace(/,\s*]/g, ']')
-      .replace(/[\x00-\x1F\x7F]/g, ' ');
+      .replace(/,(\s*[}\]])/g, '$1')
+      .replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3')
+      .replace(/:\s*'([^']*)'/g, ': "$1"');
     return JSON.parse(fixed) as T;
   }
 }
