@@ -156,14 +156,14 @@ export default function AnalyzePage() {
       )}
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {/* LEFT */}
+        {/* LEFT — hidden after analysis is complete */}
         <div style={{
-          width: analysis ? '50%' : '100%',
-          borderRight: analysis ? '1px solid #E5E7EB' : 'none',
-          display: 'flex', flexDirection: 'column', overflow: 'hidden',
-          padding: analysis ? '0' : '40px',
-          alignItems: analysis ? 'stretch' : 'center',
-          justifyContent: analysis ? 'flex-start' : 'center',
+          width: analysis ? '0' : '100%',
+          display: analysis ? 'none' : 'flex',
+          flexDirection: 'column', overflow: 'hidden',
+          padding: '40px',
+          alignItems: 'center',
+          justifyContent: 'center',
         }}>
           {!uploadedFile ? (
             <div style={{ border: '2px dashed #E5E7EB', borderRadius: '16px', padding: '48px 32px', textAlign: 'center', maxWidth: '560px', width: '100%' }}>
@@ -234,9 +234,9 @@ export default function AnalyzePage() {
           )}
         </div>
 
-        {/* RIGHT */}
+        {/* RIGHT — full width after analysis */}
         {analysis && (
-          <div style={{ width: '50%', overflowY: 'auto', padding: '24px' }}>
+          <div style={{ width: '100%', overflowY: 'auto', padding: '24px', maxWidth: '860px', margin: '0 auto' }}>
 
             {activeTab === 'overview' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
