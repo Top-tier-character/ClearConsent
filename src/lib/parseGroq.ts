@@ -18,6 +18,20 @@ export function parseGroqJson<T = any>(raw: string): T {
 
   cleaned = cleaned.slice(first, last + 1);
 
+  // Fix bare control characters (newlines, tabs, carriage returns) inside JSON
+  // string values — Groq sometimes outputs these literally, which breaks JSON.parse.
+  // This regex matches each quoted JSON string and escapes internal control chars.
+  cleaned = cleaned.replace(
+    /"((?:[^"\\]|\\.)*)"/g,
+    (_, content: string) =>
+      '"' +
+      content
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t') +
+      '"'
+  );
+
   try {
     return JSON.parse(cleaned) as T;
   } catch {
@@ -28,3 +42,4 @@ export function parseGroqJson<T = any>(raw: string): T {
     return JSON.parse(fixed) as T;
   }
 }
+

@@ -84,7 +84,7 @@ export default function AnalyzePage() {
         details: data,
       });
     } catch (err) {
-      setAnalyzeError(err instanceof Error ? err.message : 'Analysis failed. Please try again.');
+      setAnalyzeError('Analysis failed. Please try again — if this keeps happening, try a different document or switch to English.');
     } finally {
       setIsAnalyzing(false);
     }
