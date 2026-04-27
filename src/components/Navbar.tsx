@@ -73,7 +73,7 @@ export function Navbar() {
         {/* Right: Language (desktop) + theme + login + hamburger (mobile) */}
         <div className="flex items-center gap-2 shrink-0">
           <Select value={language} onValueChange={(val: any) => setLanguage(val)}>
-            <SelectTrigger className="w-[100px] h-[40px] bg-surface dark:bg-card border-border hidden sm:flex">
+            <SelectTrigger className="w-[90px] h-[36px] bg-surface dark:bg-card border-border flex text-sm">
               <SelectValue placeholder="Language" />
             </SelectTrigger>
             <SelectContent>
