@@ -35,11 +35,11 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'User not found.' }, { status: 404 });
     }
 
-    // Update in Convex
+    // Update in Convex — mutation only accepts `name` (not new_name).
+    // Email is the immutable lookup key and cannot be changed.
     await convexClient().mutation(api.mutations.updateUser as any, {
       email: current_email,
-      new_name: name ?? undefined,
-      new_email: email ?? undefined,
+      ...(name !== undefined ? { name } : {}),
     });
 
     return NextResponse.json(

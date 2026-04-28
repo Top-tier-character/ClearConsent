@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 /**
  * POST /api/extract-pdf
- * Accepts multipart/form-data with a field named "file" (a PDF).
+ * Accepts multipart/form-data with a field named "file" (a PDF or TXT).
  * Returns { text: string } with the extracted plain text.
  * Uses dynamic import of pdf-parse to avoid Next.js module-level side effects.
  */
@@ -15,18 +15,39 @@ export async function POST(req: NextRequest) {
 
     if (!file) {
       return NextResponse.json(
-        { error: 'No file uploaded', details: 'Send a PDF as "file" in form-data.' },
+        { error: 'No file uploaded', details: 'Send a PDF or TXT file as "file" in form-data.' },
         { status: 400 },
       );
     }
 
-    if (!file.name.endsWith('.pdf') && file.type !== 'application/pdf') {
+    const isPdf = file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf';
+    const isTxt = file.name.toLowerCase().endsWith('.txt') || file.type === 'text/plain';
+
+    if (!isPdf && !isTxt) {
       return NextResponse.json(
-        { error: 'Invalid file type', details: 'Only PDF files are supported.' },
+        { error: 'Unsupported file type', details: 'Only PDF and TXT files are supported.' },
         { status: 400 },
       );
     }
 
+    // ── TXT: read directly ────────────────────────────────────────────────
+    if (isTxt) {
+      const text = await file.text();
+      if (!text.trim()) {
+        return NextResponse.json(
+          { error: 'The text file appears to be empty.' },
+          { status: 400 },
+        );
+      }
+      return NextResponse.json({
+        text,
+        page_count: 1,
+        file_name: file.name,
+        file_size_kb: Math.round(file.size / 1024),
+      });
+    }
+
+    // ── PDF: use pdf-parse ────────────────────────────────────────────────
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
@@ -53,7 +74,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     return NextResponse.json(
       {
-        error: 'PDF extraction failed',
+        error: 'File extraction failed',
         details: err instanceof Error ? err.message : String(err),
       },
       { status: 500 },

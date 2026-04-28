@@ -21,6 +21,14 @@ export async function POST(req: NextRequest) {
   const startTime = Date.now();
 
   try {
+    // Bug fix: guard against missing API key — return clean 503 instead of raw SDK error.
+    if (!process.env.GROQ_API_KEY) {
+      return NextResponse.json(
+        { error: 'AI service is not configured. Please contact support.' },
+        { status: 503 },
+      );
+    }
+
     const body = await req.json();
     const {
       message,

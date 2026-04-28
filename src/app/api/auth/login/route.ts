@@ -36,6 +36,18 @@ export async function POST(req: NextRequest) {
     // Generate a session ID for this login
     const session_id = `sess-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
+    // Bug fix: persist session to Convex so chat/simulate rows can be linked back.
+    try {
+      await convexClient().mutation(api.mutations.createSession as any, {
+        session_id,
+        language_preference: 'en',
+        device_info: req.headers.get('user-agent') ?? undefined,
+      });
+    } catch (sessionErr) {
+      // Non-fatal — log but don't block login
+      console.error('[login] createSession failed:', sessionErr);
+    }
+
     return NextResponse.json({
       session_id,
       name: user.name,

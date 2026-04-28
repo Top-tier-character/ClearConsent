@@ -59,10 +59,12 @@ export default function AnalyzePage() {
       if (!res.ok) throw new Error(data.error || 'Analysis failed');
       setAnalysis(data);
       setActiveTab('overview');
+      // Bug fix: generate ONE id — two Date.now() calls in the same tick are identical.
+      const analysisId = `CLR-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       // Save to Zustand so AI assistant and dashboard are aware of this analysis
       const { addHistory, setCurrentAnalysis } = useAppStore.getState();
       setCurrentAnalysis({
-        id: `CLR-${Date.now()}`,
+        id: analysisId,
         documentType: data.document_type,
         pros: data.pros ?? [],
         cons: data.cons ?? [],
@@ -72,11 +74,16 @@ export default function AnalyzePage() {
         riskScore: data.clearconsent_score ?? 50,
         risk_explanation: data.score_explanation ?? '',
         summary: data.summary ?? '',
-        quiz: [],
+        // Bug fix: actionPlan is required by CurrentAnalysis type — derive it from risk_flags.
+        actionPlan: (data.risk_flags ?? []).map((f: any) => ({
+          riskTitle: f.title ?? '',
+          actionText: f.explanation ?? '',
+          emailTemplate: f.action_email ?? '',
+        })),
         extractedFigures: data.extracted_figures ?? null,
       });
       addHistory({
-        id: `CLR-${Date.now()}`,
+        id: analysisId,
         type: 'analysis',
         date: new Date().toISOString(),
         riskScore: data.clearconsent_score ?? 50,
